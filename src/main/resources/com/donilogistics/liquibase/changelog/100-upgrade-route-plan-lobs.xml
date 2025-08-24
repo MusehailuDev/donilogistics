@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Upgrade ROUTE_PLAN JSON columns to CLOB to avoid truncation -->
+    <changeSet id="100-upgrade-route-plan-lobs" author="doni">
+        <modifyDataType tableName="ROUTE_PLAN" columnName="STOPS" newDataType="CLOB"/>
+        <modifyDataType tableName="ROUTE_PLAN" columnName="ESTIMATED_TIMES" newDataType="CLOB"/>
+        <modifyDataType tableName="ROUTE_PLAN" columnName="SOLVER_META" newDataType="CLOB"/>
+    </changeSet>
+
+</databaseChangeLog>
+
+

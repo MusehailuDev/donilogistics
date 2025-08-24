@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Upgrade CONSOLIDATION table to match entity fields -->
+    <changeSet id="097-upgrade-consolidation-columns" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="CONSOLIDATION"/>
+        </preConditions>
+        <addColumn tableName="CONSOLIDATION">
+            <column name="ORIGIN_WAREHOUSE_ID" type="uuid"/>
+            <column name="DEST_WAREHOUSE_ID" type="uuid"/>
+            <column name="PLANNED_DEPARTURE_TIME" type="timestamp"/>
+            <column name="PLANNED_ARRIVAL_TIME" type="timestamp"/>
+            <column name="AGGREGATED_WEIGHT" type="decimal(19,2)"/>
+            <column name="AGGREGATED_VOLUME" type="decimal(19,4)"/>
+            <column name="CONSOLIDATION_POLICY" type="varchar(50)"/>
+            <column name="ECO_MODE_APPLIED" type="boolean" defaultValueBoolean="false"/>
+            <column name="CREATED_AT" type="timestamp"/>
+            <column name="SEALED_AT" type="timestamp"/>
+            <column name="DISPATCHED_AT" type="timestamp"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="097-add-indexes-and-fks" author="doni">
+        <createIndex tableName="CONSOLIDATION" indexName="IDX_CONSOLIDATION_ON_STATUS">
+            <column name="STATUS"/>
+        </createIndex>
+        <createIndex tableName="CONSOLIDATION" indexName="IDX_CONSOLIDATION_ON_ORIGIN_WAREHOUSE">
+            <column name="ORIGIN_WAREHOUSE_ID"/>
+        </createIndex>
+        <createIndex tableName="CONSOLIDATION" indexName="IDX_CONSOLIDATION_ON_DEST_WAREHOUSE">
+            <column name="DEST_WAREHOUSE_ID"/>
+        </createIndex>
+        <createIndex tableName="CONSOLIDATION" indexName="IDX_CONSOLIDATION_ON_CREATED_AT">
+            <column name="CREATED_AT"/>
+        </createIndex>
+
+        <addForeignKeyConstraint baseTableName="CONSOLIDATION" baseColumnNames="ORIGIN_WAREHOUSE_ID"
+                                  referencedTableName="ADDRESS" referencedColumnNames="ID"
+                                  constraintName="FK_CONS_ORIGIN_ADDR"/>
+        <addForeignKeyConstraint baseTableName="CONSOLIDATION" baseColumnNames="DEST_WAREHOUSE_ID"
+                                  referencedTableName="ADDRESS" referencedColumnNames="ID"
+                                  constraintName="FK_CONS_DEST_ADDR"/>
+    </changeSet>
+
+</databaseChangeLog>
+
+
+
+
+
+
+
+

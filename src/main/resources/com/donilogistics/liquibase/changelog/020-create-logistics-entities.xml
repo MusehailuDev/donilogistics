@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Create Organization table -->
+    <changeSet id="020-create-organization-table" author="doni">
+        <createTable tableName="ORGANIZATION">
+            <column name="ID" type="uuid">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="VERSION" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME" type="varchar(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="CODE" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="DESCRIPTION" type="varchar(1000)"/>
+            <column name="ADDRESS" type="varchar(500)"/>
+            <column name="PHONE_NUMBER" type="varchar(50)"/>
+            <column name="EMAIL" type="varchar(255)"/>
+            <column name="WEBSITE" type="varchar(255)"/>
+            <column name="LOGO" type="varchar(255)"/>
+            <column name="ACTIVE" type="boolean" defaultValueBoolean="true"/>
+            <column name="CREATED_DATE" type="timestamp"/>
+            <column name="CREATED_BY" type="varchar(255)"/>
+            <column name="LAST_MODIFIED_DATE" type="timestamp"/>
+            <column name="LAST_MODIFIED_BY" type="varchar(255)"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Add organization type column separately to avoid checksum mismatch -->
+    <changeSet id="025-add-organization-type-column" author="doni">
+        <addColumn tableName="ORGANIZATION">
+            <column name="ORG_TYPE" type="varchar(50)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="026-add-organization-extra-fields" author="doni">
+        <addColumn tableName="ORGANIZATION">
+            <column name="BUSINESS_LICENSE_NUMBER" type="varchar(100)"/>
+            <column name="REGISTRATION_DOCUMENT" type="varchar(1024)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Create Organization indexes -->
+    <changeSet id="020-create-organization-indexes" author="doni">
+        <createIndex tableName="ORGANIZATION" indexName="IDX_ORGANIZATION_ON_NAME">
+            <column name="NAME"/>
+        </createIndex>
+        <createIndex tableName="ORGANIZATION" indexName="IDX_ORGANIZATION_ON_CODE">
+            <column name="CODE"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Add Organization unique constraints -->
+    <changeSet id="020-add-organization-constraints" author="doni">
+        <addUniqueConstraint tableName="ORGANIZATION" columnNames="NAME" constraintName="UK_ORGANIZATION_NAME"/>
+        <addUniqueConstraint tableName="ORGANIZATION" columnNames="CODE" constraintName="UK_ORGANIZATION_CODE"/>
+    </changeSet>
+
+    <!-- Create Vehicle table -->
+    <changeSet id="020-create-vehicle-table" author="doni">
+        <createTable tableName="VEHICLE">
+            <column name="ID" type="uuid">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="VERSION" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="LICENSE_PLATE" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="MAKE" type="varchar(100)"/>
+            <column name="MODEL" type="varchar(100)"/>
+            <column name="YEAR" type="int"/>
+            <column name="VIN" type="varchar(50)"/>
+            <column name="CAPACITY" type="decimal(10,2)"/>
+            <column name="CAPACITY_UNIT" type="varchar(20)"/>
+            <column name="FUEL_TYPE" type="varchar(50)"/>
+            <column name="REGISTRATION_EXPIRY" type="date"/>
+            <column name="INSURANCE_EXPIRY" type="date"/>
+            <column name="MAINTENANCE_DUE_DATE" type="date"/>
+            <column name="STATUS" type="varchar(50)" defaultValue="AVAILABLE"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+            <column name="ASSIGNED_DRIVER_ID" type="uuid"/>
+                        <column name="CURRENT_LOCATION" type="varchar(255)"/>
+            <column name="GPS_TRACKING_ENABLED" type="boolean" defaultValueBoolean="false"/>
+            <column name="NOTES" type="varchar(1000)"/>
+            <column name="CREATED_DATE" type="timestamp"/>
+            <column name="CREATED_BY" type="varchar(255)"/>
+            <column name="LAST_MODIFIED_DATE" type="timestamp"/>
+            <column name="LAST_MODIFIED_BY" type="varchar(255)"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Create Vehicle indexes -->
+    <changeSet id="020-create-vehicle-indexes" author="doni">
+        <createIndex tableName="VEHICLE" indexName="IDX_VEHICLE_ON_LICENSE_PLATE">
+            <column name="LICENSE_PLATE"/>
+        </createIndex>
+        <createIndex tableName="VEHICLE" indexName="IDX_VEHICLE_ON_ORGANIZATION">
+            <column name="ORGANIZATION_ID"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Add Vehicle unique constraint -->
+    <changeSet id="020-add-vehicle-constraints" author="doni">
+        <addUniqueConstraint tableName="VEHICLE" columnNames="LICENSE_PLATE" constraintName="UK_VEHICLE_LICENSE_PLATE"/>
+    </changeSet>
+
+    <!-- Create Shipment table -->
+    <changeSet id="020-create-shipment-table" author="doni">
+        <createTable tableName="SHIPMENT">
+            <column name="ID" type="uuid">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="VERSION" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="TRACKING_NUMBER" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="SHIPMENT_TYPE" type="varchar(100)"/>
+            <column name="PRIORITY" type="varchar(50)" defaultValue="NORMAL"/>
+            <column name="STATUS" type="varchar(50)" defaultValue="PENDING"/>
+            <column name="WEIGHT" type="decimal(10,2)"/>
+            <column name="WEIGHT_UNIT" type="varchar(20)"/>
+            <column name="DIMENSIONS" type="varchar(100)"/>
+            <column name="PICKUP_ADDRESS" type="varchar(500)"/>
+            <column name="PICKUP_CONTACT" type="varchar(255)"/>
+            <column name="PICKUP_PHONE" type="varchar(50)"/>
+            <column name="PICKUP_INSTRUCTIONS" type="varchar(1000)"/>
+            <column name="DELIVERY_ADDRESS" type="varchar(500)"/>
+            <column name="DELIVERY_CONTACT" type="varchar(255)"/>
+            <column name="DELIVERY_PHONE" type="varchar(50)"/>
+            <column name="DELIVERY_INSTRUCTIONS" type="varchar(1000)"/>
+            <column name="REQUESTED_PICKUP_DATE" type="timestamp"/>
+            <column name="REQUESTED_DELIVERY_DATE" type="timestamp"/>
+            <column name="ACTUAL_PICKUP_DATE" type="timestamp"/>
+            <column name="ACTUAL_DELIVERY_DATE" type="timestamp"/>
+            <column name="ESTIMATED_COST" type="decimal(10,2)"/>
+            <column name="ACTUAL_COST" type="decimal(10,2)"/>
+            <column name="CUSTOMER_REFERENCE" type="varchar(255)"/>
+            <column name="INTERNAL_NOTES" type="varchar(1000)"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+            <column name="ASSIGNED_VEHICLE_ID" type="uuid"/>
+            <column name="ASSIGNED_DRIVER_ID" type="uuid"/>
+            <column name="CREATED_BY_USER_ID" type="uuid"/>
+            <column name="CREATED_DATE" type="timestamp"/>
+            <column name="CREATED_BY" type="varchar(255)"/>
+            <column name="LAST_MODIFIED_DATE" type="timestamp"/>
+            <column name="LAST_MODIFIED_BY" type="varchar(255)"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Create Shipment indexes -->
+    <changeSet id="020-create-shipment-indexes" author="doni">
+        <createIndex tableName="SHIPMENT" indexName="IDX_SHIPMENT_ON_TRACKING_NUMBER">
+            <column name="TRACKING_NUMBER"/>
+        </createIndex>
+        <createIndex tableName="SHIPMENT" indexName="IDX_SHIPMENT_ON_ORGANIZATION">
+            <column name="ORGANIZATION_ID"/>
+        </createIndex>
+        <createIndex tableName="SHIPMENT" indexName="IDX_SHIPMENT_ON_STATUS">
+            <column name="STATUS"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Add Shipment unique constraint -->
+    <changeSet id="020-add-shipment-constraints" author="doni">
+        <addUniqueConstraint tableName="SHIPMENT" columnNames="TRACKING_NUMBER" constraintName="UK_SHIPMENT_TRACKING_NUMBER"/>
+    </changeSet>
+
+    <!-- Update USER_ table to add new columns -->
+    <changeSet id="020-update-user-table" author="doni">
+        <addColumn tableName="USER_">
+            <column name="EMAIL_VERIFIED" type="boolean" defaultValueBoolean="false"/>
+            <column name="EMAIL_VERIFICATION_TOKEN" type="varchar(255)"/>
+            <column name="EMAIL_VERIFICATION_EXPIRES" type="timestamp"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+            <column name="USER_ROLE" type="varchar(50)"/>
+            <column name="PHONE_NUMBER" type="varchar(50)"/>
+            <column name="ADDRESS" type="varchar(500)"/>
+            <column name="PROFILE_IMAGE" type="varchar(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Create User indexes -->
+    <changeSet id="020-create-user-indexes" author="doni">
+        <createIndex tableName="USER_" indexName="IDX_USER__ON_EMAIL">
+            <column name="EMAIL"/>
+        </createIndex>
+        <createIndex tableName="USER_" indexName="IDX_USER__ON_ORGANIZATION">
+            <column name="ORGANIZATION_ID"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Add User unique constraint -->
+    <changeSet id="020-add-user-constraints" author="doni">
+        <addUniqueConstraint tableName="USER_" columnNames="EMAIL" constraintName="UK_USER_EMAIL"/>
+    </changeSet>
+
+    <!-- Add foreign key constraints -->
+    <changeSet id="020-add-foreign-keys" author="doni">
+        <addForeignKeyConstraint baseTableName="USER_" baseColumnNames="ORGANIZATION_ID"
+                                  constraintName="FK_USER_ORGANIZATION"
+                                  referencedTableName="ORGANIZATION" referencedColumnNames="ID"/>
+
+        <addForeignKeyConstraint baseTableName="VEHICLE" baseColumnNames="ORGANIZATION_ID"
+                                  constraintName="FK_VEHICLE_ORGANIZATION"
+                                  referencedTableName="ORGANIZATION" referencedColumnNames="ID"/>
+
+        <addForeignKeyConstraint baseTableName="VEHICLE" baseColumnNames="ASSIGNED_DRIVER_ID"
+                                  constraintName="FK_VEHICLE_DRIVER"
+                                  referencedTableName="USER_" referencedColumnNames="ID"/>
+
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="ORGANIZATION_ID"
+                                  constraintName="FK_SHIPMENT_ORGANIZATION"
+                                  referencedTableName="ORGANIZATION" referencedColumnNames="ID"/>
+
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="ASSIGNED_VEHICLE_ID"
+                                  constraintName="FK_SHIPMENT_VEHICLE"
+                                  referencedTableName="VEHICLE" referencedColumnNames="ID"/>
+
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="ASSIGNED_DRIVER_ID"
+                                  constraintName="FK_SHIPMENT_DRIVER"
+                                  referencedTableName="USER_" referencedColumnNames="ID"/>
+
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="CREATED_BY_USER_ID"
+                                  constraintName="FK_SHIPMENT_CREATED_BY"
+                                  referencedTableName="USER_" referencedColumnNames="ID"/>
+    </changeSet>
+
+</databaseChangeLog>

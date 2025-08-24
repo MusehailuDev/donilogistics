@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns="http://jmix.io/schema/rest/services">
+    <service name="doni_UserRegistrationService">
+        <method name="registerUser">
+            <param name="username" type="java.lang.String"/>
+            <param name="email" type="java.lang.String"/>
+            <param name="password" type="java.lang.String"/>
+            <param name="firstName" type="java.lang.String"/>
+            <param name="lastName" type="java.lang.String"/>
+            <param name="phoneNumber" type="java.lang.String"/>
+            <param name="address" type="java.lang.String"/>
+            <param name="organizationId" type="java.util.UUID"/>
+            <param name="userRole" type="com.donilogistics.entity.UserRole"/>
+        </method>
+        <method name="verifyEmail">
+            <param name="token" type="java.lang.String"/>
+        </method>
+        <method name="getActiveOrganizations"/>
+    </service>
+    
+    <service name="doni_LogisticsService">
+        <method name="createShipment">
+            <param name="shipmentData" type="com.donilogistics.entity.Shipment"/>
+        </method>
+        <method name="updateShipmentStatus">
+            <param name="shipmentId" type="java.util.UUID"/>
+            <param name="status" type="com.donilogistics.entity.ShipmentStatus"/>
+        </method>
+        <method name="assignVehicleToShipment">
+            <param name="shipmentId" type="java.util.UUID"/>
+            <param name="vehicleId" type="java.util.UUID"/>
+        </method>
+        <method name="assignDriverToShipment">
+            <param name="shipmentId" type="java.util.UUID"/>
+            <param name="driverId" type="java.util.UUID"/>
+        </method>
+    </service>
+</services>

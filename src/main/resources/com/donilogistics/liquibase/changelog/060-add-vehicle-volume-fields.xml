@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="060-add-vehicle-volume-fields" author="donilogistics">
+        <comment>Add volume capacity fields to VEHICLE table for containerization support</comment>
+        
+        <!-- Add volume capacity column -->
+        <addColumn tableName="VEHICLE">
+            <column name="VOLUME_CAPACITY" type="DOUBLE">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        
+        <!-- Add volume unit column -->
+        <addColumn tableName="VEHICLE">
+            <column name="VOLUME_UNIT" type="VARCHAR(20)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        
+        <!-- Add comment to document the purpose -->
+        <sql>
+            COMMENT ON COLUMN VEHICLE.VOLUME_CAPACITY IS 'Volume capacity in cubic units (m3, ft3, etc.) for containerization calculations';
+            COMMENT ON COLUMN VEHICLE.VOLUME_UNIT IS 'Unit of measurement for volume capacity (m3, ft3, cm3, etc.)';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

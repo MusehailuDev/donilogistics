@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="070-create-address-table" author="donilogistics">
+        <comment>Create ADDRESS table for normalized address management</comment>
+        
+        <!-- Create ADDRESS table -->
+        <createTable tableName="ADDRESS">
+            <column name="ID" type="UUID">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="VERSION" type="INTEGER" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME" type="VARCHAR(255)"/>
+            <column name="CONTACT_PERSON" type="VARCHAR(255)"/>
+            <column name="PHONE" type="VARCHAR(50)"/>
+            <column name="STREET_ADDRESS" type="VARCHAR(500)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="CITY" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="STATE" type="VARCHAR(100)"/>
+            <column name="COUNTRY" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="POSTAL_CODE" type="VARCHAR(20)"/>
+            <column name="LATITUDE" type="DECIMAL(19,6)"/>
+            <column name="LONGITUDE" type="DECIMAL(19,6)"/>
+            <column name="GEOHASH" type="VARCHAR(12)"/>
+            <column name="ADDRESS_TYPE" type="VARCHAR(50)"/>
+            <column name="IS_ACTIVE" type="BOOLEAN" defaultValueBoolean="true"/>
+            <column name="ORGANIZATION_ID" type="UUID"/>
+        </createTable>
+
+        <!-- Create ADDRESS indexes -->
+        <createIndex tableName="ADDRESS" indexName="IDX_ADDRESS_ON_GEOHASH">
+            <column name="GEOHASH"/>
+        </createIndex>
+        <createIndex tableName="ADDRESS" indexName="IDX_ADDRESS_ON_CITY_STATE">
+            <column name="CITY"/>
+            <column name="STATE"/>
+        </createIndex>
+        <createIndex tableName="ADDRESS" indexName="IDX_ADDRESS_ON_POSTAL_CODE">
+            <column name="POSTAL_CODE"/>
+        </createIndex>
+
+        <!-- Add foreign key constraint -->
+        <addForeignKeyConstraint baseTableName="ADDRESS" baseColumnNames="ORGANIZATION_ID"
+                                  referencedTableName="ORGANIZATION" referencedColumnNames="ID"
+                                  constraintName="FK_ADDRESS_ORGANIZATION"/>
+
+        <!-- Add comment -->
+        <sql>
+            COMMENT ON TABLE ADDRESS IS 'Normalized addresses for pickup, delivery, and warehouse locations';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

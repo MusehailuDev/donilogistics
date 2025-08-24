@@ -1,0 +1,7 @@
+login and registration 
+the web app is intended to be multitenant with multiple organizations and every organization manger can manage and have previlage to its own entities and users.
+every user first register with
+standard registration field of requirements and plus additional fields for choosing organization name from lists of available organizations which must be unique from list of available organizations which must be created by super admin previlage.
+role choosing in the logistic operation system like
+organizational admin, dispatcher/fleet manager, driver, warehouse manger, facilitator....etc add any relevant fields
+add email verification method after registration to be verified by the user via email sent code and after they login enable kyc approval field for registered roles as per requirements if they are not just clients/users.

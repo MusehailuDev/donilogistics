@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="092-upgrade-shipment-advanced-columns" author="donilogistics">
+        <!-- Add columns if not exist -->
+        <preConditions onFail="CONTINUE"/>
+
+        <addColumn tableName="SHIPMENT">
+            <column name="EXTERNAL_ORDER_ID" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="COMMODITY_TYPE" type="VARCHAR(100)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="WEIGHT_KG" type="DECIMAL(19,2)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="LENGTH_CM" type="DECIMAL(10,2)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="WIDTH_CM" type="DECIMAL(10,2)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="HEIGHT_CM" type="DECIMAL(10,2)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="VOLUME_M3" type="DECIMAL(10,4)"/>
+        </addColumn>
+
+        <addColumn tableName="SHIPMENT">
+            <column name="PICKUP_ADDRESS_ID" type="UUID"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="DELIVERY_ADDRESS_ID" type="UUID"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="CUSTOMER_ID" type="UUID"/>
+        </addColumn>
+
+        <addColumn tableName="SHIPMENT">
+            <column name="DECLARED_VALUE" type="DECIMAL(19,2)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="DIMS_CONFIRMED" type="BOOLEAN" defaultValueBoolean="false"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="CONSOLIDATION_ALLOWED" type="BOOLEAN" defaultValueBoolean="true"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="CONSOLIDATION_PRIORITY" type="INT" defaultValueNumeric="0"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="PARENT_CONSOLIDATION_ID" type="UUID"/>
+        </addColumn>
+
+        <addColumn tableName="SHIPMENT">
+            <column name="PREFERRED_DELIVERY_FROM" type="TIMESTAMP"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="PREFERRED_DELIVERY_TO" type="TIMESTAMP"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="ECO_MODE" type="VARCHAR(20)" defaultValue="NONE"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="ROUTING_PREFERENCES" type="VARCHAR(2000)"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="CREATED_AT" type="TIMESTAMP"/>
+        </addColumn>
+        <addColumn tableName="SHIPMENT">
+            <column name="UPDATED_AT" type="TIMESTAMP"/>
+        </addColumn>
+
+        <!-- Indexes -->
+        <createIndex tableName="SHIPMENT" indexName="IDX_SHIPMENT_EXTERNAL_ORDER_ID">
+            <column name="EXTERNAL_ORDER_ID"/>
+        </createIndex>
+        <createIndex tableName="SHIPMENT" indexName="IDX_SHIPMENT_CUSTOMER_ID">
+            <column name="CUSTOMER_ID"/>
+        </createIndex>
+        <createIndex tableName="SHIPMENT" indexName="IDX_SHIPMENT_CONSOLIDATION_PRIORITY">
+            <column name="CONSOLIDATION_PRIORITY"/>
+        </createIndex>
+
+        <!-- FKs -->
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="PICKUP_ADDRESS_ID"
+                                  referencedTableName="ADDRESS" referencedColumnNames="ID"
+                                  constraintName="FK_SHIPMENT_PICKUP_ADDRESS"/>
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="DELIVERY_ADDRESS_ID"
+                                  referencedTableName="ADDRESS" referencedColumnNames="ID"
+                                  constraintName="FK_SHIPMENT_DELIVERY_ADDRESS"/>
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="CUSTOMER_ID"
+                                  referencedTableName="ORGANIZATION" referencedColumnNames="ID"
+                                  constraintName="FK_SHIPMENT_CUSTOMER"/>
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="PARENT_CONSOLIDATION_ID"
+                                  referencedTableName="CONSOLIDATION" referencedColumnNames="ID"
+                                  constraintName="FK_SHIPMENT_PARENT_CONSOLIDATION"/>
+
+    </changeSet>
+
+</databaseChangeLog>

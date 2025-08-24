@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Create ROUTE_PLAN table -->
+    <changeSet id="096-create-route-plan" author="doni">
+        <createTable tableName="ROUTE_PLAN">
+            <column name="ID" type="uuid">
+                <constraints nullable="false" primaryKey="true"/>
+            </column>
+            <column name="VERSION" type="int">
+                <constraints nullable="false"/>
+            </column>
+            <column name="NAME" type="varchar(255)"/>
+            <column name="VEHICLE_ID" type="uuid"/>
+            <column name="DRIVER_ID" type="uuid"/>
+            <column name="CAPACITY_KG" type="decimal(19,2)"/>
+            <column name="CAPACITY_VOLUME_M3" type="decimal(10,4)"/>
+            <column name="ALLOWED_LOAD_TYPES" type="varchar(500)"/>
+            <column name="CURRENT_LATITUDE" type="decimal(10,6)"/>
+            <column name="CURRENT_LONGITUDE" type="decimal(10,6)"/>
+            <column name="LAST_SEEN" type="timestamp"/>
+            <column name="ROUTE_STATUS" type="varchar(50)"/>
+            <column name="STOPS" type="varchar(4000)"/>
+            <column name="ESTIMATED_TIMES" type="varchar(2000)"/>
+            <column name="SOLVER_META" type="varchar(2000)"/>
+            <column name="CREATED_AT" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="UPDATED_AT" type="timestamp">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Create ROUTE_STOP table (already created in 040, keep for safety if not present) -->
+    <changeSet id="096-create-route-stop" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="ROUTE_STOP"/></not>
+        </preConditions>
+        <createTable tableName="ROUTE_STOP">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="ROUTE_PLAN_ID" type="uuid"/>
+            <column name="SEQUENCE_NO" type="int"/>
+            <column name="LAT" type="decimal(10,6)"/>
+            <column name="LON" type="decimal(10,6)"/>
+            <column name="SHIPMENT_ID" type="uuid"/>
+            <column name="WAREHOUSE_ID" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- Add FKs -->
+    <changeSet id="096-add-fks" author="doni">
+        <addForeignKeyConstraint baseTableName="ROUTE_PLAN" baseColumnNames="VEHICLE_ID" referencedTableName="VEHICLE" referencedColumnNames="ID" constraintName="FK_ROUTEPLAN_VEHICLE"/>
+        <addForeignKeyConstraint baseTableName="ROUTE_PLAN" baseColumnNames="DRIVER_ID" referencedTableName="DRIVER_PROFILE" referencedColumnNames="ID" constraintName="FK_ROUTEPLAN_DRIVER"/>
+        <addForeignKeyConstraint baseTableName="ROUTE_PLAN" baseColumnNames="ORGANIZATION_ID" referencedTableName="ORGANIZATION" referencedColumnNames="ID" constraintName="FK_ROUTEPLAN_ORG"/>
+        <addForeignKeyConstraint baseTableName="ROUTE_STOP" baseColumnNames="ROUTE_PLAN_ID" referencedTableName="ROUTE_PLAN" referencedColumnNames="ID" constraintName="FK_ROUTESTOP_ROUTEPLAN"/>
+    </changeSet>
+
+</databaseChangeLog>
+
+

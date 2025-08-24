@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="099-add-driver-location" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="DRIVER_PROFILE" columnName="CURRENT_LATITUDE"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="DRIVER_PROFILE">
+            <column name="CURRENT_LATITUDE" type="DECIMAL(10,6)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="099-add-driver-longitude" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="DRIVER_PROFILE" columnName="CURRENT_LONGITUDE"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="DRIVER_PROFILE">
+            <column name="CURRENT_LONGITUDE" type="DECIMAL(10,6)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="099-add-driver-lastseen" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="DRIVER_PROFILE" columnName="LAST_SEEN"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="DRIVER_PROFILE">
+            <column name="LAST_SEEN" type="TIMESTAMP"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>
+
+
+

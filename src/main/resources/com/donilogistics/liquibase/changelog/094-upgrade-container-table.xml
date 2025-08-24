@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Extend existing CONTAINER table from 040-create-additional-entities.xml -->
+    <changeSet id="094-add-container-columns" author="donilogistics">
+        <addColumn tableName="CONTAINER">
+            <column name="OWNER_NAME" type="varchar(255)"/>
+            <column name="OWNER_EMAIL" type="varchar(255)"/>
+            <column name="OWNER_PHONE" type="varchar(100)"/>
+            <column name="ASSET_TAG" type="varchar(100)"/>
+            <column name="CURRENT_WAREHOUSE_ID" type="uuid"/>
+            <column name="MANUFACTURE_YEAR" type="int"/>
+            <column name="TARE_WEIGHT_KG" type="decimal(19,2)"/>
+            <column name="MAX_GROSS_WEIGHT_KG" type="decimal(19,2)"/>
+            <column name="MAX_VOLUME_M3" type="decimal(19,4)"/>
+            <column name="CREATED_AT" type="timestamp"/>
+            <column name="UPDATED_AT" type="timestamp"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="094-add-container-fks-indexes" author="donilogistics">
+        <createIndex indexName="IDX_CONTAINER_ON_CURRENT_WH" tableName="CONTAINER">
+            <column name="CURRENT_WAREHOUSE_ID"/>
+        </createIndex>
+        <addForeignKeyConstraint baseTableName="CONTAINER" baseColumnNames="CURRENT_WAREHOUSE_ID"
+                                 referencedTableName="WAREHOUSE" referencedColumnNames="ID"
+                                 constraintName="FK_CONTAINER_WAREHOUSE"/>
+    </changeSet>
+
+</databaseChangeLog>

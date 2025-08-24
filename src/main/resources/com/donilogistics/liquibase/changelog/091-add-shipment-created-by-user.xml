@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="091-add-shipment-created-by-user" author="donilogistics">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="SHIPMENT" columnName="CREATED_BY_USER_ID"/>
+            </not>
+        </preConditions>
+
+        <addColumn tableName="SHIPMENT">
+            <column name="CREATED_BY_USER_ID" type="UUID"/>
+        </addColumn>
+
+        <addForeignKeyConstraint baseTableName="SHIPMENT"
+                                  baseColumnNames="CREATED_BY_USER_ID"
+                                  referencedTableName="USER_"
+                                  referencedColumnNames="ID"
+                                  constraintName="FK_SHIPMENT_CREATED_BY_USER"/>
+    </changeSet>
+
+</databaseChangeLog>

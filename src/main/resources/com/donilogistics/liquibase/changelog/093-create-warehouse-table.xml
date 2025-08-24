@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Upgrade existing WAREHOUSE table created in 040-create-additional-entities.xml -->
+    <changeSet id="093-add-warehouse-columns" author="donilogistics">
+        <addColumn tableName="WAREHOUSE">
+            <column name="LATITUDE" type="decimal(19,6)"/>
+            <column name="LONGITUDE" type="decimal(19,6)"/>
+            <column name="ADDRESS_LINE1" type="varchar(255)"/>
+            <column name="ADDRESS_LINE2" type="varchar(255)"/>
+            <column name="CITY" type="varchar(100)"/>
+            <column name="STATE" type="varchar(100)"/>
+            <column name="COUNTRY" type="varchar(10)"/>
+            <column name="POSTAL_CODE" type="varchar(50)"/>
+            <column name="CAPACITY_WEIGHT_KG" type="decimal(19,2)"/>
+            <column name="CAPACITY_VOLUME_M3" type="decimal(19,4)"/>
+            <column name="OPERATING_HOURS" type="varchar(1000)"/>
+            <column name="CONTACT_NAME" type="varchar(255)"/>
+            <column name="CONTACT_PHONE" type="varchar(100)"/>
+            <column name="CREATED_AT" type="timestamp"/>
+            <column name="UPDATED_AT" type="timestamp"/>
+            <column name="MANAGER_USER_ID" type="uuid"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="093-add-warehouse-indexes" author="donilogistics">
+        <createIndex indexName="IDX_WAREHOUSE_ON_CITY" tableName="WAREHOUSE">
+            <column name="CITY"/>
+        </createIndex>
+        <createIndex indexName="IDX_WAREHOUSE_ON_ORGANIZATION" tableName="WAREHOUSE">
+            <column name="ORGANIZATION_ID"/>
+        </createIndex>
+        <createIndex indexName="IDX_WAREHOUSE_ON_MANAGER" tableName="WAREHOUSE">
+            <column name="MANAGER_USER_ID"/>
+        </createIndex>
+        <!-- CODE already indexed in 040; keep as non-unique for now to avoid conflicts -->
+        <addForeignKeyConstraint baseTableName="WAREHOUSE" baseColumnNames="MANAGER_USER_ID"
+                                 referencedTableName="USER_" referencedColumnNames="ID"
+                                 constraintName="FK_WAREHOUSE_MANAGER"/>
+    </changeSet>
+
+</databaseChangeLog>

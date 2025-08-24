@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- Add additional fields to VEHICLE table -->
+    <changeSet id="050-add-vehicle-coordinates" author="doni">
+        <addColumn tableName="VEHICLE">
+            <column name="CURRENT_LATITUDE" type="decimal(10,7)"/>
+            <column name="CURRENT_LONGITUDE" type="decimal(10,7)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="050-add-vehicle-documents" author="doni">
+        <addColumn tableName="VEHICLE">
+            <column name="REGISTRATION_DOCUMENT" type="varchar(1024)"/>
+            <column name="INSURANCE_DOCUMENT" type="varchar(1024)"/>
+            <column name="VEHICLE_PHOTO" type="varchar(1024)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Create DRIVER_PROFILE table -->
+    <changeSet id="050-create-driver-profile" author="doni">
+        <createTable tableName="DRIVER_PROFILE">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="USER_ID" type="uuid"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+            <column name="BLOOD_TYPE" type="varchar(10)"/>
+            <column name="DRIVING_LICENSE_NUMBER" type="varchar(100)"/>
+            <column name="AGE" type="int"/>
+            <column name="HIRED_DATE" type="date"/>
+            <column name="DL_ISSUE_DATE" type="date"/>
+            <column name="DL_EXPIRY_DATE" type="date"/>
+            <column name="DL_DOCUMENT" type="varchar(1024)"/>
+            <column name="ID_DOCUMENT" type="varchar(1024)"/>
+            <column name="NOTES" type="varchar(1000)"/>
+            <column name="ACTIVE" type="boolean"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="050-driver-profile-indexes" author="doni">
+        <createIndex tableName="DRIVER_PROFILE" indexName="IDX_DRIVER_PROFILE_ON_USER">
+            <column name="USER_ID"/>
+        </createIndex>
+        <createIndex tableName="DRIVER_PROFILE" indexName="IDX_DRIVER_PROFILE_ON_ORG">
+            <column name="ORGANIZATION_ID"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="050-driver-profile-fks" author="doni">
+        <addForeignKeyConstraint baseTableName="DRIVER_PROFILE" baseColumnNames="USER_ID" referencedTableName="USER_" referencedColumnNames="ID" constraintName="FK_DRIVER_PROFILE_USER"/>
+        <addForeignKeyConstraint baseTableName="DRIVER_PROFILE" baseColumnNames="ORGANIZATION_ID" referencedTableName="ORGANIZATION" referencedColumnNames="ID" constraintName="FK_DRIVER_PROFILE_ORG"/>
+    </changeSet>
+
+</databaseChangeLog>

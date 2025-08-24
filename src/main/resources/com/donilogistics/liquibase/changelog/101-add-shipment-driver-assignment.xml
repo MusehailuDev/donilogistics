@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="101-add-shipment-assigned-driver" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="SHIPMENT" columnName="ASSIGNED_DRIVER_ID"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="SHIPMENT">
+            <column name="ASSIGNED_DRIVER_ID" type="UUID"/>
+        </addColumn>
+        <addForeignKeyConstraint baseTableName="SHIPMENT" baseColumnNames="ASSIGNED_DRIVER_ID"
+                                  referencedTableName="USER_" referencedColumnNames="ID"
+                                  constraintName="FK_SHIPMENT_ASSIGNED_DRIVER"/>
+    </changeSet>
+
+    <changeSet id="101-add-shipment-assigned-at" author="doni">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="SHIPMENT" columnName="ASSIGNED_AT"/>
+            </not>
+        </preConditions>
+        <addColumn tableName="SHIPMENT">
+            <column name="ASSIGNED_AT" type="TIMESTAMP"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>
+
+

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <!-- WAREHOUSE -->
+    <changeSet id="040-create-warehouse" author="doni">
+        <createTable tableName="WAREHOUSE">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="NAME" type="varchar(255)"><constraints nullable="false"/></column>
+            <column name="CODE" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="ADDRESS" type="varchar(500)"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+            <column name="ACTIVE" type="boolean"/>
+        </createTable>
+    </changeSet>
+    <changeSet id="040-warehouse-indexes" author="doni">
+        <createIndex tableName="WAREHOUSE" indexName="IDX_WAREHOUSE_CODE"><column name="CODE"/></createIndex>
+        <createIndex tableName="WAREHOUSE" indexName="IDX_WAREHOUSE_ORG"><column name="ORGANIZATION_ID"/></createIndex>
+    </changeSet>
+
+    <!-- PARTY (PERSON) -->
+    <changeSet id="040-create-party" author="doni">
+        <createTable tableName="PARTY">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="FIRST_NAME" type="varchar(100)"/>
+            <column name="LAST_NAME" type="varchar(100)"/>
+            <column name="EMAIL" type="varchar(255)"/>
+            <column name="PHONE" type="varchar(50)"/>
+            <column name="ROLE" type="varchar(50)"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+
+
+    <!-- CONTAINER -->
+    <changeSet id="040-create-container" author="doni">
+        <createTable tableName="CONTAINER">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="CONTAINER_NUMBER" type="varchar(100)"><constraints nullable="false"/></column>
+            <column name="TYPE" type="varchar(50)"/>
+            <column name="STATUS" type="varchar(50)"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+        </createTable>
+    </changeSet>
+    <changeSet id="040-container-indexes" author="doni">
+        <createIndex tableName="CONTAINER" indexName="IDX_CONTAINER_NUMBER"><column name="CONTAINER_NUMBER"/></createIndex>
+    </changeSet>
+
+    <!-- CONSOLIDATION GROUP -->
+    <changeSet id="040-create-consolidation" author="doni">
+        <createTable tableName="CONSOLIDATION">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="CODE" type="varchar(100)"/>
+            <column name="CONTAINER_ID" type="uuid"/>
+            <column name="ORGANIZATION_ID" type="uuid"/>
+            <column name="STATUS" type="varchar(50)"/>
+        </createTable>
+    </changeSet>
+    <changeSet id="040-create-consolidation-item" author="doni">
+        <createTable tableName="CONSOLIDATION_ITEM">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="CONSOLIDATION_ID" type="uuid"/>
+            <column name="SHIPMENT_ID" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ROUTE PLAN & STOPS -->
+    <changeSet id="040-create-route-stop" author="doni">
+        <createTable tableName="ROUTE_STOP">
+            <column name="ID" type="uuid"><constraints nullable="false" primaryKey="true"/></column>
+            <column name="VERSION" type="int"><constraints nullable="false"/></column>
+            <column name="ROUTE_PLAN_ID" type="uuid"/>
+            <column name="SEQUENCE_NO" type="int"/>
+            <column name="LAT" type="decimal(10,6)"/>
+            <column name="LON" type="decimal(10,6)"/>
+            <column name="SHIPMENT_ID" type="uuid"/>
+            <column name="WAREHOUSE_ID" type="uuid"/>
+        </createTable>
+    </changeSet>
+
+    <!-- FKs -->
+    <changeSet id="040-add-fks" author="doni">
+        <addForeignKeyConstraint baseTableName="WAREHOUSE" baseColumnNames="ORGANIZATION_ID" referencedTableName="ORGANIZATION" referencedColumnNames="ID" constraintName="FK_WAREHOUSE_ORG"/>
+        <addForeignKeyConstraint baseTableName="PARTY" baseColumnNames="ORGANIZATION_ID" referencedTableName="ORGANIZATION" referencedColumnNames="ID" constraintName="FK_PARTY_ORG"/>
+        <addForeignKeyConstraint baseTableName="CONTAINER" baseColumnNames="ORGANIZATION_ID" referencedTableName="ORGANIZATION" referencedColumnNames="ID" constraintName="FK_CONTAINER_ORG"/>
+        <addForeignKeyConstraint baseTableName="CONSOLIDATION" baseColumnNames="CONTAINER_ID" referencedTableName="CONTAINER" referencedColumnNames="ID" constraintName="FK_CONSOLIDATION_CONTAINER"/>
+        <addForeignKeyConstraint baseTableName="CONSOLIDATION" baseColumnNames="ORGANIZATION_ID" referencedTableName="ORGANIZATION" referencedColumnNames="ID" constraintName="FK_CONSOLIDATION_ORG"/>
+        <addForeignKeyConstraint baseTableName="CONSOLIDATION_ITEM" baseColumnNames="CONSOLIDATION_ID" referencedTableName="CONSOLIDATION" referencedColumnNames="ID" constraintName="FK_CONSITEM_CONS"/>
+        <addForeignKeyConstraint baseTableName="CONSOLIDATION_ITEM" baseColumnNames="SHIPMENT_ID" referencedTableName="SHIPMENT" referencedColumnNames="ID" constraintName="FK_CONSITEM_SHIPMENT"/>
+        <addForeignKeyConstraint baseTableName="ROUTE_STOP" baseColumnNames="WAREHOUSE_ID" referencedTableName="WAREHOUSE" referencedColumnNames="ID" constraintName="FK_STOP_WAREHOUSE"/>
+        <addForeignKeyConstraint baseTableName="ROUTE_STOP" baseColumnNames="SHIPMENT_ID" referencedTableName="SHIPMENT" referencedColumnNames="ID" constraintName="FK_STOP_SHIPMENT"/>
+    </changeSet>
+
+</databaseChangeLog>
+
+

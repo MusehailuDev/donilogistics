@@ -1,0 +1,2727 @@
+REST API
+Jmix provides a generic REST API that allows you to work with data model entities and business services without writing REST controllers on the backend. It automatically exposes endpoints for the following functionality:
+
+CRUD operations on entities.
+
+Calling of registered service methods.
+
+Execution of predefined JPQL queries.
+
+Uploading and downloading files.
+
+Returning information about the data model.
+
+Returning information about the current user and their permissions.
+
+You can explore the generic REST endpoints using the Swagger UI page at https://docs.jmix.io/openapi/2.6
+REST API uses the OAuth2 protocol for authentication and supports anonymous access. All REST API endpoints respect data access constraints imposed by security.
+
+The REST DataStore add-on allows you to consume the generic REST API in another Jmix application for easy integration.
+Installation
+Generic REST API is shipped as an optional add-on. To install it automatically through Jmix Marketplace, follow instructions in the Add-ons section.
+
+For manual installation, add the following dependencies to your build.gradle:
+
+implementation 'io.jmix.rest:jmix-rest-starter'
+Getting Started with REST
+This section contains an example of retrieving the information about application users through the Generic REST API.
+
+First, add the Generic REST add-on to your project according to the installation section.
+
+Obtaining Access Token
+To access the protected resource the client must present a valid access token. The OAuth 2.1 specification provides several ways to get an access token from the authorization server. They are called grant types. In this example, we will use the Client Credentials grant which is suitable for confidential clients, such as backend integrations.
+
+The functionality responsible for issuing tokens and supporting OAuth 2.1 protocol features is located inside the Authorization Server add-on. You must add this add-on to your application. See the Authorization Server add-on documentation for instructions on how to do this.
+
+implementation 'io.jmix.authserver:jmix-authserver-starter'
+The idea is that in Jmix application we must register the client (e.g. an external application that needs to access Jmix REST API), define client id and secret, and then using these credentials we will be able to get the access token by a special HTTP request.
+
+The simplest way to register a client is to add standard Spring Authorization Server application properties:
+
+# The client id is my-client
+spring.security.oauth2.authorizationserver.client.myclient.registration.client-id=my-client
+# The client secret (password) is my-secret
+spring.security.oauth2.authorizationserver.client.myclient.registration.client-secret={noop}my-secret
+# Enable Client Credential grant for the my-client
+spring.security.oauth2.authorizationserver.client.myclient.registration.authorization-grant-types=client_credentials
+# Client credentials must be passed in the Authorization header using the HTTP Basic authentication scheme
+spring.security.oauth2.authorizationserver.client.myclient.registration.client-authentication_methods=client_secret_basic
+# Use opaque tokens instead of JWT
+spring.security.oauth2.authorizationserver.client.myclient.token.access-token-format=reference
+# access token time-to-live
+spring.security.oauth2.authorizationserver.client.myclient.token.access-token-time-to-live=24h
+The next set of application properties is Jmix-specific and defines which resource and row-level roles must be assigned to the access token issued to the client. In this example we will assign two resource roles:
+
+rest-minimal (REST: minimal access) - to enable REST API endpoints access.
+
+user-management (User management) - to allow operations with the User entity using REST API.
+
+# my-client is the client id we configured previously
+jmix.authserver.client.myclient.client-id = my-client
+jmix.authserver.client.myclient.resource-roles = user-management, rest-minimal
+The user-management role looks as follows:
+
+@ResourceRole(name = "User management", code = UserManagementRole.CODE, scope = "API") 
+public interface UserManagementRole {
+
+    String CODE = "user-management";
+
+    @EntityAttributePolicy(entityClass = User.class, attributes = "*", action = EntityAttributePolicyAction.MODIFY)
+    @EntityPolicy(entityClass = User.class, actions = EntityPolicyAction.ALL)
+    void user();
+}
+The API scope indicates the role will be applied for REST API requests
+After these properties are defined in the application it should be possible to obtain access tokens. In this example, we will use the curl command-line tool to interact with the REST API.
+
+curl -X POST http://localhost:8080/oauth2/token \
+   --basic --user my-client:my-secret \
+   -H "Content-Type: application/x-www-form-urlencoded" \
+   -d "grant_type=client_credentials"
+On Windows, remove \ symbols and write the command in a single line.
+As a result, you should get something like this:
+
+HTTP/1.1 200
+{
+  "access_token":"hKhgNyGMTqaKd6prH-GoHF8zFVTSr9tKKyE3OnMoafRO4FT4Xq_cewHr28cIRITaRmF0olRXpVTyFdxcOPTAl8Vc7xopHrdNuXNXwEeBn7NSiEMvQXW5zO0dwMn_H8FQ",
+  "token_type":"Bearer",
+  "expires_in":299
+}
+The access_token attribute is the token you can use for further requests as part of the Authorization Header. It acts as a temporary credential that grants you access to the application.
+
+Configuring REST Endpoints Security
+By default, when you add the REST API add-on to the application, no security settings are applied to the REST endpoints. There are multiple ways to protect these endpoints. One way is to configure authenticated URLs for resource server by adding the following application property:
+
+jmix.resource-server.authenticated-url-patterns = /rest/**
+If the security of the REST endpoints is not configured in one way or another, then accessing them will either redirect to the UI login page or result in a server error due to executing code without the user’s security context.
+Retrieving Entity List
+With the access token you can use the generic REST API endpoints to load a list of users (replace <access_token> with the value obtained on the previous step). In this example, we will fetch all the users that are present in the application through the Entities API:
+
+curl -X GET http://localhost:8080/rest/entities/User \
+    -H "Authorization: Bearer <access_token>"
+This request supposes that your project contains an entity named User.
+
+The entity name is either a Java class name or the value of name attribute in the @Entity or @JmixEntity annotation. If you have specified a Project id when created the project, the entity name is <projectid>_User.
+
+The response will contain all users that are available in the application:
+
+HTTP/1.1 200
+[
+  {
+    "_entityName": "User",
+    "_instanceName": "[admin]",
+    "id": "60885987-1b61-4247-94c7-dff348347f93",
+    "version": 1,
+    "active": true,
+    "username": "admin"
+  }
+]
+
+Access Control
+Protecting API Using Access Tokens
+Access to REST API endpoints may be protected with access tokens. The Authorization Server add-on may be used for obtaining access tokens. See the Authorization Server add-on documentation for details.
+
+Anonymous Access
+It is possible to expose certain parts of the REST API without authentication by using the anonymous access functionality of Jmix. In this case, the API request is performed as the user anonymous, which is configured by default in a Jmix application.
+
+For every secured endpoint that is called without the Authentication header, the user will be authenticated with the anonymous user session.
+
+See the Token Based Authentication section for details on how to define access to anonymous resources. The easiest way is to set an application property with a comma-separated list of anonymous URL patterns.
+
+jmix.resource-server.anonymous-url-patterns = \
+  /rest/services/productService/getProductInformation,\
+  /rest/entities/Product/**
+Once this setting is in place, it is possible to interact with the ProductService without sending an Authorization header:
+
+GetProductInformation Request
+GET {{baseRestUrl}}
+         /services
+         /productService
+         /getProductInformation
+         ?productId=123
+# Authorization: not set
+This request will respond in a successful response of the Service:
+
+HTTP/1.1 200
+{
+  "name": "Apple iPhone",
+  "productId": "123",
+  "price": 499.99
+}
+If you want to provide anonymous access to some entities endpoints, make sure the anonymous user has rights to these entities. You can do it by creating a resource role and assigning it to the anonymous user in the DatabaseUserRepository.initAnonymousUser() method. For example:
+
+@ResourceRole(name = "AnonymousRestRole", code = AnonymousRestRole.CODE, scope = "API")
+public interface AnonymousRestRole {
+
+    String CODE = "anonymous-rest-role";
+
+    @EntityAttributePolicy(entityClass = Product.class,
+        attributes = "*",
+        action = EntityAttributePolicyAction.MODIFY)
+    @EntityPolicy(entityClass = Product.class,
+        actions = {EntityPolicyAction.READ, EntityPolicyAction.UPDATE})
+    void product();
+}
+@Primary
+@Component("UserRepository")
+public class DatabaseUserRepository extends AbstractDatabaseUserRepository<User> {
+    // ...
+
+    @Override
+    protected void initAnonymousUser(User anonymousUser) {
+        Collection<GrantedAuthority> authorities = getGrantedAuthoritiesBuilder()
+                .addResourceRole(AnonymousRestRole.CODE)
+                .build();
+        anonymousUser.setAuthorities(authorities);
+    }
+}
+The anonymous access feature does not require that anonymous user has the rest-minimal role.
+Predefined Roles
+REST: minimal access (rest-minimal): Allows users to interact with the application via the API.
+
+
+
+Entities API
+The Entities API provides different capabilities to interact with entity instances. This API mainly consists of CRUD operations that can be performed on the entities. The ability to load entity data is extended by different ways of filtering and JPQL.
+
+When performing operations on entities through this generic API, the regular Jmix security permissions are applied from the user obtained the authentication token.
+
+
+LOAD ENTITIES
+The Entities API allows you to load entities through the API in various ways:
+
+Load Entity by ID loads a single entity by its unique identifier (ID).
+
+Load List of Entities load all entities with pagination and sorting.
+
+Load Entities via Search Filter allows you to filter for entities by filter criteria in the Request.
+
+Load Entities via JPQL loads entities via pre-configuring named JPQL queries.
+
+Load Entity by ID
+The first way of loading an entity via the Entities API is by loading it via its ID. The corresponding endpoint for this is the Load Entity endpoint /entities/:entityName/:entityId.
+
+The :entityName path parameter defines which entity type it is. The value is defined in the entity definition:
+
+Order.java
+@JmixEntity
+@Table(name = "SAMPLE_ORDER")
+@Entity(name = "sample_Order") 
+public class Order {
+    // ...
+}
+The name attribute value sample_Order of the @Entity JPA annotation indicates the entityName parameter in the Entities API.
+The Load Entity endpoint returns a single instance in case it is found by its identifier. Otherwise, HTTP status code 404 - Not Found is returned.
+
+Load Order Request
+GET http://localhost:8080/rest
+            /entities
+            /sample_Order
+            /21021f78-edac-224b-e6f8-6e71e02a0f0d
+Response: 200 - OK
+{
+  "_entityName": "sample_Order", 
+  "_instanceName": "rest.sample.entity.Order-21021f78-edac-224b-e6f8-6e71e02a0f0d [detached]",
+  "id": "21021f78-edac-224b-e6f8-6e71e02a0f0d",
+  "date": "2020-12-13", 
+  "amount": 49.99,
+  "createdDate": "2021-02-06T12:03:38.049",
+  "createdBy": "admin",
+  "lastModifiedDate": "2021-02-06T12:03:38.049",
+  "version": 1
+}
+Some metadata about the entity instance is returned as JSON keys (entityName, _instanceName and id).
+The JSON Object contains each business attribute as a key.
+If the entity has a composite ID, pass it to the REST endpoint as Base64-encoded JSON.
+
+For example, if the ID class contains two fields code1 and code2, the identifier value in JSON will be like {"code1": "val1","code2": "val2"} and the whole URL with encoded ID will be like this:
+
+GET http://localhost:8080/rest
+            /entities
+            /MyEntity
+            /eyJjb2RlMSI6ICJ2YWwxIiwiY29kZTIiOiAidmFsMiJ9
+Some attributes of the Order entity are missing in the JSON, as by default only local and persistent attributes of the entity are loaded. In case of reference attributes should also be included in the response you need to use Fetch Plans as described below.
+
+In case you want to include dynamic attributes in the response, use the dynamicAttributes parameter to add a special hint to the query:
+
+GET http://localhost:8080/rest
+            /entities
+            /sample_Order
+            /21021f78-edac-224b-e6f8-6e71e02a0f0d
+            ?dynamicAttributes=true
+
+
+
+
+Load List of Entities
+You can load a list of entities of any type using the Load Entity List API endpoint: /entities/:entityName. This API includes pagination, sorting, and fetch plans.
+
+Request
+GET http://localhost:8080/rest/entities/sample_Customer
+Response: HTTP 200 - OK
+[
+  {
+    "id": "0826806e-6074-90fa-f241-564b5c94d018",
+    "name": "Sidney Chandler"
+  },
+  {
+    "id": "22efc597-69a9-aeef-4e4a-7afccd8e5767",
+    "name": "Randall Bishop"
+  },
+  {
+    "id": "bd1c8e90-3d35-cbe2-9efd-167202c758d2",
+    "name": "Shelby Robinson"
+  }
+]
+Every entity in the response has a _entityName attribute with the name of the entity, and an _instanceName attribute with the Instance Name of the entity.
+It is also possible to further control the behavior of the API by using the following URL query parameters:
+
+dynamicAttributes
+whether dynamic attributes should be loaded for an entity (Boolean).
+
+fetchPlan
+name or URL-encoded JSON object of an entity’s fetch plan (String).
+
+limit
+the number of entities to be returned by the API (int).
+
+offset
+the position of the first returned entity (int).
+
+sort
+an entity attribute that will be used for sorting (String).
+
++attribute or simply attribute for ascending order
+
+-attribute for descending order.
+
+Using Sorting
+The Load Entities API supports the sorting of the result by entity attributes. You can use the sort URL parameter for controlling the order of entities.
+
+When the sort parameter is not specified, the default sort order depends on the database implementation. Normally databases sort by the timestamp of record creation, but this behavior is not guaranteed and can vary in different situations.
+Jmix has a special syntax to define the sort order. Ascending order is expressed through a + before the attribute name. This is optional though, as it is the default behavior sorting order. For descending order, you need to prefix the entity attribute with a - character.
+
+The following example shows how you can sort Customers by their name attribute ascending.
+
+Request
+GET http://localhost:8080/rest
+            /entities
+            /sample_Customer
+            ?sort=name
+Response: HTTP 200 - OK
+[
+  {
+    "id": "d83c9d66-cb23-075a-8d3c-d4035d338705",
+    "name": "Klaudia Kleinert"
+  },
+  {
+    "id": "8985ba1e-1cc8-eb5c-f9e0-738aee9d2ef1",
+    "name": "Randall Bishop"
+  }
+]
+You can also sort by multiple attributes. In this case, the sort order takes a comma-separated list of attributes to sort by.
+
+Request
+GET http://localhost:8080/rest
+            /entities
+            /sample_Order?sort=+date,-amount
+Response: HTTP 200 - OK
+[
+  {
+    "id": "41aae331-b46b-85ee-b0bc-2de8cbf1ab86",
+    "date": "2021-02-02", 
+    "amount": 283.55
+  },
+  {
+    "id": "288a5d75-f06f-d150-9b70-efee1272b96c",
+    "date": "2021-03-01",
+    "amount": 249.99, 
+    "lastModifiedBy": "admin"
+  },
+  {
+    "id": "1068c217-5868-faf4-16aa-23655e9492da",
+    "date": "2021-03-01",
+    "amount": 130.08
+  }
+]
+The result with the oldest date is returned first.
+When the date attribute is the same, the amount is used to sort the results.
+Using Pagination
+The Entities API supports Pagination to respect the data processing limitation that might be present on the server or client-side. In case you want to load only a particular subset of the entities, you can provide the offset and limit URL parameters.
+
+Pagination is active by default, even if it is not explicitly requested by the client. In case no limit value is present in the request, the Load APIs will return only the first 10,000 entities.
+
+This default value is configurable globally via jmix.rest.default-max-fetch-size or on an entity-by-entity basis via jmix.rest.entityMaxFetchSize.
+
+The following example demonstrates how to load the third Page containing two Customer entities (5. & 6. entity):
+
+Load Customer Request with Pagination
+GET http://localhost:8080/rest
+            /entities
+            /sample_Customer
+            ?limit=2
+            &offset=4
+            &sort=createdDate
+Response: HTTP 200 - OK
+[
+  {
+    "id": "2d620164-1e80-0696-c3aa-45b7b5c81f2c",
+    "name": "Maria Mitchell"
+  },
+  {
+    "id": "3c7ec69d-9b85-c6e9-387b-42a5bccb79de",
+    "name": "Anthony Knutson"
+  }
+]
+Load Entities via Search Filter
+You can specify filter criteria when loading entities using the Entity Search Endpoint: /entities/:entityName/search.
+
+Both HTTP methods GET and POST are possible when interacting with the search endpoint. In both cases, the filter criterion has to be provided as part of the request.
+
+The filter definition is a JSON structure that contains a set of conditions. A condition consists of the following attributes:
+
+property
+the entity attribute that is being filtered on (like amount on the Order entity).
+
+In case the attribute is a reference to another entity, it can also be a property path like customer.name
+
+operator
+the filter operator. An operator describes how to filter for a particular attribute. There are multiple operators that can be used independently of the datatype:
+
+Standard Operators: =, <>, notEmpty, isNull
+
+List Operators: in, notIn
+
+Additionally, some operators are only possible for particular datatypes:
+
+Datatype	Specific Operators
+String, UUID
+
+startsWith, endsWith, contains, doesNotContain
+
+Integer, Long, Double, BigDecimal, Date, DateTime, Time, LocalDate, LocalDateTime, LocalTime, OffsetDateTime, OffsetTime
+
+=, <>, >, >=, <, <=
+
+value
+the value to search for. Value is not required for the notEmpty and isNull operators.
+
+Additionally, conditions can be combined via AND, OR group conditions to define a more complex filter criterion. The JSON structure of the filter definitions looks like this:
+
+Filter Criterion JSON structure
+{
+  "conditions": [
+    {
+      "group": "OR",
+      "conditions": [
+        {
+          "property": "stringField",
+          "operator": "=",
+          "value": "stringValue"
+        },
+        {
+          "property": "intField",
+          "operator": ">",
+          "value": 100
+        }
+      ]
+    },
+    {
+      "property": "booleanField",
+      "operator": "=",
+      "value": true
+    }
+  ]
+}
+This is a representation of the Filter criterion: ((stringField = stringValue) OR (intField > 100) AND (booleanField = true)).
+
+When using the HTTP POST method, the filter is part of the request body.
+
+Filter POST Request
+POST http://localhost:8080/rest/entities/sample_Order/search
+
+{
+  "filter": {
+    "conditions": [
+      {
+        "property": "customer.name",
+        "operator": "=",
+        "value": "Shelby Robinson"
+      }
+    ]
+  }
+}
+When using the GET method, the JSON filter criterion needs to be transferred via the URL Query parameter filter.
+
+Filter GET Request
+GET http://localhost:8080/rest
+            /entities
+            /sample_Order
+            /search
+            ?filter={"conditions":[{"property":"customer.name","operator":"contains","value":"Shelby"}]}
+URI Encoding
+The HTTP URI standard only allows ASCII characters as part of the URI / URL. When using URL Query parameters for the filter definition, the JSON definition has to be URL encoded to match this requirement. This is also true for the value data that normally contains user input.
+
+As there is also a practical limit of the URI length that can cause problems for big filter definitions, the POST method for filtering entities should be preferred as those restrictions do not apply.
+
+Load Entities via JPQL
+Another alternative to loading entities from the application is to use predefined JPQL queries. The Entity Query Endpoint /queries/:entityName/:queryName is responsible for providing this capability. Queries can contain a list of parameters, that need to be provided by the client. Additionally, the endpoint contains the same general parameters for pagination, fetch plans, etc.
+
+When to use JPQL vs. Search Filter?
+Jmix provides various ways to load entity data generically. Use pre-defined JPQL queries when the search filter is not advanced enough to express the filter criterion. Also in case, the parameter should be pre-defined and not be adjustable by the API client.
+
+JPQL Query Configuration
+To use the Entity Query endpoint you need to define the accessible queries. This happens via an XML configuration file, normally called rest-queries.xml. You need to create this new file in your Jmix application under src/main/resources. It lists all published queries with information about their parameters.
+
+rest-queries.xml
+<?xml version="1.0"?>
+<queries xmlns="http://jmix.io/schema/rest/queries">
+    <query name="ordersByDate" entity="sample_Order" fetchPlan="order-with-details">
+        <jpql><![CDATA[select e from sample_Order e where e.date = :orderDate]]></jpql>
+        <params>
+            <param name="orderDate" type="java.time.LocalDate"/>
+        </params>
+    </query>
+    <query name="ordersByCustomerName" entity="sample_Order" fetchPlan="order-with-details">
+        <jpql><![CDATA[select e from sample_Order e where e.customer.name = :customerName]]></jpql>
+        <params>
+            <param name="customerName" type="java.lang.String"/>
+        </params>
+    </query>
+</queries>
+A query needs to have a unique name value as well as an entity reference. The combination of name and entity needs to be unique. Also, a fetchPlan needs to be referenced to indicate which entity attributes are returned.
+
+In the <jpql> tag the actual query is configured. The parameters need to be listed within the params tag defining their name and Java type. In the query parameters, you can reference via their name prefixed with a colon like :customerName.
+
+After the file has been created, and the queries have been defined, you need to register the rest-queries.xml configuration in the application.properties of your Jmix application:
+
+application.properties
+jmix.rest.queries-config = rest/sample/rest-queries.xml
+You can invoke the Entity Query endpoint either by the GET or POST HTTP method. In the case of GET, the parameters are appended as URL query parameters.
+
+Query API GET Request
+GET http://localhost:8080/rest
+        /queries
+        /sample_Order
+        /ordersByDate
+        ?orderDate=2020-02-02
+URI Encoding
+The URL should only contain ASCII characters. This means the values of the parameters need to be URL encoded, as those values normally represent direct user input and therefore it cannot be ensured that non-ASCII characters are used.
+
+In the case of using POST, the query parameters are transferred in the JSON body containing each parameter as a key.
+
+Query API POST Request
+POST http://localhost:8080/rest/queries/sample_Order/ordersByCustomerName
+
+{
+  "customerName": "Shelby Robinson"
+}
+Collection Parameters
+It is also possible to define a parameter as a collection type. In this case, the query definition should contain an [] indicator after the Java type.
+
+rest-queries.xml
+<?xml version="1.0"?>
+<queries xmlns="http://jmix.io/schema/rest/queries">
+    <query name="ordersByIds" entity="sample_Order" fetchPlan="order-with-details">
+        <jpql><![CDATA[select e from sample_Order e where e.id in :ids]]></jpql>
+        <params>
+            <param name="ids" type="java.util.UUID[]"/> 
+        </params>
+    </query>
+</queries>
+The ids parameter is marked as collection of UUID type.
+When this parameter is used in a query, the corresponding IDs have to be provided as a JSON array.
+
+Query API Collection Parameters Request
+POST http://localhost:8080/rest/queries/sample_Order/ordersByIds
+
+{
+  "ids": [
+    "41aae331-b46b-85ee-b0bc-2de8cbf1ab86",
+    "21021f78-edac-224b-e6f8-6e71e02a0f0d"
+  ]
+}
+Return Empty Values in JSON
+By default, Jmix will remove empty values (null) from the JSON response, so that the attribute keys are not present in the JSON document.
+
+You can control this behavior by using the URL query parameter returnNulls and set its value to true. With that, Jmix will always add the attribute keys to the response, independent if the value is empty or not.
+
+In the following example, a Customer is loaded by its ID and also requesting to contain all empty values:
+
+Load Customer with empty values
+GET http://localhost:8080/rest
+            /entities
+            /sample_Customer
+            /1eab4973-25f9-70d9-5356-6990dd8f79e2
+            ?returnNulls=true
+Response: 200 - OK
+{
+  "_entityName": "sample_Customer",
+  "_instanceName": "Sidney Chandler",
+  "id": "0826806e-6074-90fa-f241-564b5c94d018",
+  "createdDate": "2021-06-09T08:42:39.291",
+  "createdBy": "admin",
+  "lastModifiedDate": "2021-06-09T08:42:39.291",
+  "deletedDate": null,
+  "lastModifiedBy": null,
+  "name": "Sidney Chandler",
+  "type": null, 
+  "version": 1,
+  "deletedBy": null
+}
+The response contains the key type although it is empty
+The Parameter returnNulls is present in all Entity Load APIs: Load by ID, Load List, Search and Load by Query.
+Using Fetch Plans
+The required attributes for an entity typically depend on the client’s use case, UI, or integration scenario. Loading only the direct attributes of an entity is often insufficient.
+
+Without the ability to load referenced entities in a single request, additional requests would be needed to fetch related data, leading to N+1 query issues. This can cause significant overhead, especially in HTTP-based interactions.
+
+To address this, the Load Entities API supports Fetch Plans. Fetch plans allow you to define a hierarchy of attributes to be loaded in a single batch from the database and delivered to the client, optimizing performance and reducing overhead.
+
+Named Fetch Plans
+Named fetch plans are registered in the shared fetch plans repository of the application (see Creating Fetch Plans). They can be used in REST requests by specifying their names.
+
+The following example demonstrates how to load a list of Orders with additional information about the corresponding customer, the linked order lines, and the product of each order line.
+
+First, you need to register the fetch plan order-with-details in the fetch-plans.xml configuration file:
+
+fetch-plans.xml
+<fetchPlans xmlns="http://jmix.io/schema/core/fetch-plans">
+    <fetchPlan class="rest.sample.entity.Order"
+               extends="_base"
+               name="order-with-details">
+        <property name="customer"/>
+        <property name="lines" fetchPlan="_base">
+            <property name="product" fetchPlan="_instance_name" />
+        </property>
+    </fetchPlan>
+</fetchPlans>
+With that fetch plan configuration in place, you can perform a GET request and reference the fetch plan using the fetchPlan URL parameter.
+
+In the example below the Order with the ID 21021f78-edac-224b-e6f8-6e71e02a0f0d is loaded with the fetch plan order-with-details in order to additionally load customer and lines data:
+
+Load Order with fetch plan request
+GET http://localhost:8080/rest
+            /entities
+            /sample_Order
+            /21021f78-edac-224b-e6f8-6e71e02a0f0d
+            ?fetchPlan=order-with-details
+Response: 200 - OK
+{
+  "id": "21021f78-edac-224b-e6f8-6e71e02a0f0d",
+  "date": "2020-12-13",
+  "amount": 49.99,
+  "lines": [ 
+    {
+      "id": "64e4fbb0-7fd6-818b-984e-a8769c4fbe88",
+      "product": {
+        "id": "7750adbe-6c30-cede-31a6-577a1a96aa83",
+        "name": "Outback Power Remote Power System"
+      },
+      "quantity": 1.0
+    }
+  ],
+  "version": 1,
+  "customer": {
+    "id": "0826806e-6074-90fa-f241-564b5c94d018",
+    "name": "Sidney Chandler",
+  }
+}
+The fetch plan order-with-details ensures that additional attributes like lines and customer are also included.
+When using a POST request to load data, for example in the search endpoint, pass the fetch plan name in the fetchPlan property of the request body JSON:
+
+Filter POST request with named fetch plan
+POST http://localhost:8080/rest/entities/sample_Order/search
+
+{
+  "filter": {
+    "conditions": [
+      {
+        "property": "customer.name",
+        "operator": "=",
+        "value": "Shelby Robinson"
+      }
+    ]
+  },
+  "fetchPlan": "order-with-details"
+}
+Inline Fetch Plans
+Since Jmix 2.5, the Entities API supports also inline fetch plans.
+
+Inline fetch plans are passed with REST requests as JSON objects, representing the fetch plan structure. Local attributes of entities are specified by their names, references are specified by nested JSON objects consisting of the attribute name and its nested fetch plan. The entity property on the top level must specify the root entity name.
+
+If you make requests to generic REST from another Jmix application, you can use the FetchPlanSerialization bean for converting fetch plans to JSON strings.
+
+Inline fetch plan can be used in all endpoints accepting fetch plans. For example:
+
+Filter POST request with inline fetch plan
+POST http://localhost:8080/rest/entities/sample_Order/search
+
+{
+  "filter": {
+    "conditions": [
+      {
+        "property": "customer.name",
+        "operator": "=",
+        "value": "Shelby Robinson"
+      }
+    ]
+  },
+  "fetchPlan": {
+    "entity": "sample_Order",
+    "properties": [
+      "id",
+      "number",
+      "date",
+      "amount",
+      {
+        "name": "customer",
+        "fetchPlan": {
+          "properties": [
+            "id",
+            "name",
+            "status"
+          ]
+        }
+      }
+    ]
+  }
+}
+When using inline fetch plans in GET requests as a URL parameter, the JSON must be URL-encoded. For example:
+
+Load Order with inline fetch plan
+GET http://localhost:8080/rest
+            /entities
+            /sample_Order
+            /21021f78-edac-224b-e6f8-6e71e02a0f0d
+            ?fetchPlan=%7B%22entity%22%3A%22sample_Order%22%2C%22properties%22%3A%5B%22id%22%2C%22number%22%2C%22date%22%2C%22amount%22%2C%7B%22name%22%3A%22customer%22%2C%22fetchPlan%22%3A%7B%22properties%22%3A%5B%22id%22%2C%22name%22%2C%22status%22%5D%7D%7D%5D%7D
+Inline fetch plans can be disabled using the jmix.rest.inline-fetch-plan-enabled application property.
+
+
+Create Entities
+The Entities API lets you create entities by performing a POST request against the /entities/:entityName endpoint.
+
+Create an Entity
+The request body contains a JSON object with the attributes of the entity.
+
+Attributes from Entity Traits like id or createdBy should not be part of the request. Those attributes are automatically added by Jmix while storing the entity.
+When the entity is created successfully, the HTTP response status code 201 - Created is returned. By default, a JSON metadata representation of the entity is returned mainly containing the newly created id attribute for further reference.
+
+Create Customer Request
+POST http://localhost:8080/rest/entities/sample_Customer
+
+{
+  name: "Randall Bishop"
+}
+Response: 201 - Created
+{
+  "_entityName": "sample_Customer",
+  "_instanceName": "Randall Bishop",
+  "id": "78e7996d-8b69-6526-8e9f-16262a1c4113"
+}
+Alternatively, it is possible to define which attributes should be returned once the entity is created. This can be achieved through the URL query parameter responseFetchPlan.
+
+For example, the URL /entities/sample_Order?responseFetchPlan=order-with-details would return the complete order with all its details containing order lines, customer references etc.
+
+The HTTP response Header Location indicates also the URL to the newly created entity instance for further operations (like fetching, updating, or deleting).
+Entity Validation
+When an entity is created or updated, the regular entity validation is active and enforced by default. This means that invalid input (according to the entity validation annotations) from the API is rejected with the HTTP response status code 400 - Bad Request.
+
+The API returns detailed error messages for each validation violation in the following form of a JSON array. Each entry follows the structure:
+
+message
+the (translated) human-readable error message of the violation
+
+messageTemplate
+the non-interpolated error message for this constraint violation
+
+path
+the attribute name (or property path) of the attribute that caused the violation
+
+invalidValue
+the value that was part of the request for the attribute, which causes the violation
+
+The following request contains two errors in the request, as 1. the customer attribute is required and 2. the date should not be in the future.
+
+Invalid Order Request
+POST http://localhost:8080/rest/entities/sample_Order
+
+{
+  "date": "2048-01-01",
+  "amount": 49.99,
+  "customer": null
+}
+The API then returns the list of violations of the entity validations.
+
+Response: 400 - Bad Request
+[
+  {
+    "message": "javax.validation.constraints.PastOrPresent.message",
+    "messageTemplate": "{javax.validation.constraints.PastOrPresent.message}",
+    "path": "date",
+    "invalidValue": "2048-01-01"
+  },
+  {
+    "message": "may not be null",
+    "messageTemplate": "{javax.validation.constraints.NotNull.message}",
+    "path": "customer",
+    "invalidValue": null
+  }
+]
+Association Attributes
+When the entity to create should be linked to another existing entity, it is required to reference the other entity in the request.
+
+In the Order example, you want to reference a Customer via the customer attribute when you create the Order. This is done through a JSON object containing only the ID of the existing entity. Jmix performs a lookup of the customer by the provided ID from the JSON request and links the customer to the new order.
+
+Request with N:1 reference
+POST http://localhost:8080/rest/entities/sample_Order
+
+{
+  "customer": {
+    "id": "f88597ff-009d-1cf2-4a90-a4fb5b08d835"
+  },
+  "date": "2021-03-01",
+  "amount": 130.08
+}
+For all kinds of associations: 1:N, N:1, M:N the way to reference other entities is always via its ID.
+
+The second example shows how to link a Product to multiple ProductTag entities via an M:N relationship, as described in the Product entity definition.
+
+Product.java
+@JmixEntity
+@Table(name = "SAMPLE_PRODUCT")
+@Entity(name = "sample_Product")
+public class Product {
+
+    @JoinTable(name = "SAMPLE_PRODUCT_PRODUCT_TAG_LINK",
+            joinColumns = @JoinColumn(name = "PRODUCT_ID"),
+            inverseJoinColumns = @JoinColumn(name = "PRODUCT_TAG_ID"))
+    @ManyToMany
+    private List<ProductTag> tags;
+
+    // ...
+
+}
+In the request, the ProductTag entity instances are references by their ids. This time, the JSON object is put into an array, as there are multiple product tags to reference.
+
+Request with M:N references
+POST http://localhost:8080/rest/entities/sample_Product?responseFetchPlan=product-with-tags
+
+{
+  "name": "123",
+  "price": 99.95,
+  "tags": [
+    {
+      "id": "333f3a20-c47b-4bc9-ba34-a72d2d815695" 
+    },
+    {
+      "id": "c4c028f0-fec1-7512-83cd-c17537d1f502"
+    }
+  ]
+}
+Response: 201 - Created
+{
+  "id": "f0e04748-dcdf-d856-2482-2904f2126fcc",
+  "price": 99.95,
+  "name": "123",
+  "tags": [
+    {
+      "id": "333f3a20-c47b-4bc9-ba34-a72d2d815695", 
+      "name": "shiny"
+    },
+    {
+      "id": "c4c028f0-fec1-7512-83cd-c17537d1f502",
+      "name": "great"
+    }
+  ]
+}
+The tags are referenced as a list of JSON objects containing the ID of the already existing ProductTag.
+The response contains the stored association to the two ProductTag entities.
+Composition Attributes
+For attributes that are marked as @Composition the situation is slightly different. As this relationship type indicates that the child entities only exist as part of the parent entity, it is also possible to directly create child entities as part of the request to create a parent.
+
+In the next example, the OrderLine entity is a child entity of the Order entity. This is expressed through the @Composition annotation on the lines attribute of the Order entity.
+
+Order.java
+public class Order {
+    @JmixGeneratedValue
+    @Column(name = "ID", nullable = false)
+    @Id
+    private UUID id;
+
+    @Composition
+    @OneToMany(mappedBy = "order")
+    private List<OrderLine> lines;
+
+    // ...
+}
+When you create an order through the API you can directly create its order lines as part of the request. In this case, all the attributes of the child entity need to be provided. The relationship from the parent to the child does not need to be additionally referenced. Putting the child entity into the JSON array is enough to establish the connection.
+
+The following JSON request will create an order with its order lines:
+
+Request with child entities
+POST http://localhost:8080/rest/entities/sample_Order
+
+{
+  "customer": {
+    "id": "f88597ff-009d-1cf2-4a90-a4fb5b08d835"
+  },
+  "date": "2021-03-01",
+  "amount": 130.08,
+  "lines": [ 
+    {
+      "quantity": 2,
+      "product": {
+        "id": "7750adbe-6c30-cede-31a6-577a1a96aa83"  
+      }
+    },
+    {
+      "quantity": 1,
+      "product": {
+        "code": "1ed85c7a-89f1-c339-a738-16307ed6003a"
+      }
+    }
+  ]
+}
+Order lines are created as an array of JSON objects containing all the attributes of the entity.
+In case a child entity needs to reference another entity (like the N:1 reference from the OrderLine to Product), the same rules of referencing via JSON object containing the ID apply.
+Bulk Creation
+The Create-Entity API also allows you to create multiple entities within one request. For this the JSON request body should contain an array of JSON objects representing each entity.
+
+Bulk Creation Request
+POST http://localhost:8080/rest
+            /entities
+            /sample_Customer
+
+[
+  {
+    "name": "Randall Bishop"
+  },
+  {
+    "name": "Sarah Doogle"
+  }
+]
+Response: 201 - Created
+[
+  {
+    "id": "c5fea05d-9062-6ac8-e9b1-7051616de102"
+  },
+  {
+    "id": "4a6a3aa0-ecf5-dcf4-7b37-a268a4cd3720"
+  }
+]
+In case of a violation of an entity validation, the entities will not be created, and a corresponding Error message will be returned. See Entity Validation for further details.
+
+
+
+Update Entities
+The Entities API also allows you to update already existing entities through the endpoint: /entities/:entityName/:entityId with the HTTP method PUT.
+
+Update an Entity
+When the entity is updated successfully, the HTTP response status code 200 - OK is returned. By default, a JSON metadata representation of the entity is returned mainly containing the id attribute for further reference.
+
+Here is an example of how to update an entity:
+
+Create Customer Request
+PUT http://localhost:8080/rest
+            /entities
+            /sample_Customer
+            /13f01f59-8e5f-4fd9-802b-66501d49ac99
+
+{
+  name: "Updated Name"
+}
+Response: 200 - OK
+{
+  "_entityName": "sample_Customer",
+  "_instanceName": "Updated Name",
+  "id": "13f01f59-8e5f-4fd9-802b-66501d49ac99"
+}
+The Update Entity API behaves similarly to the Create Entities API regarding validation and entity references. The main difference is how 1:N associations and compositions are handled. The endpoint also allows you to partially update entities by only having those attributes in the request JSON.
+
+Association Attributes
+In case you want to update a 1:1 or N:1 association attribute, it is enough to send the new ID of the entity to reference. For 1:N or M:N associations an updated list of entity references changes what the entity is associated to.
+
+The Update Entity endpoint will replace the existing association collection for a 1:N or M:N association with what is part of the request. For every entity reference that is not part of the request, the reference will be removed. But, the entity that has been referenced will not be deleted from the database.
+In this example, you will see how to update an M:N association between Product and ProductTag. Assuming that the stored Product before the update looks like this:
+
+Existing Product
+{
+  "id": "e1d586b4-aefb-2ee7-3b91-b07357b178ea",
+  "price": 99.95,
+  "name": "Outback Power Remote Power System",
+  "version": 1,
+  "tags": [
+    {
+      "id": "333f3a20-c47b-4bc9-ba34-a72d2d815695",
+      "name": "shiny"
+    },
+    {
+      "id": "c4c028f0-fec1-7512-83cd-c17537d1f502",
+      "name": "great"
+    }
+  ]
+}
+In this example you would like to change the tags of the Product in the following ways:
+
+great should be removed from the tags.
+
+amazing should be added to the tags.
+
+The tag shiny should be kept.
+
+Update Tag Associations Request
+PUT http://localhost:8080/rest
+            /entities
+            /sample_Product
+            /e1d586b4-aefb-2ee7-3b91-b07357b178ea
+            ?responseFetchPlan=product-with-tags
+
+{
+  "name": "123",
+  "price": 99.95,
+  "tags": [
+    {
+      "id": "333f3a20-c47b-4bc9-ba34-a72d2d815695" 
+    },
+    {
+      "id": "d6ab132e-a0bd-a624-c6ad-cc544e83c584" 
+    }
+  ]
+}
+The ID of the product tag shiny is part of the request to keep the association.
+The ID of the product tag amazing is newly added to the association.
+As the ID of the product tag great (c4c028f0-fec1-7512-83cd-c17537d1f502) is not part of the request anymore, it will be removed from the association.
+Response: 200 - OK
+{
+  "id": "e1d586b4-aefb-2ee7-3b91-b07357b178ea",
+  "createdBy": "admin",
+  "price": 99.95,
+  "name": "Outback Power Remote Power System",
+  "version": 2,
+  "tags": [
+    {
+      "id": "333f3a20-c47b-4bc9-ba34-a72d2d815695",
+      "name": "shiny" 
+    },
+    {
+      "id": "d6ab132e-a0bd-a624-c6ad-cc544e83c584",
+      "name": "amazing" 
+    }
+  ]
+}
+The shiny reference is still there, as it was part of the request
+The amazing reference has been added, whereas the tag great is not part of the association anymore.
+Remove *:1 Entity References
+To remove a reference for N:1 or 1:1 associations, you need to send in null as a value. The absence of the attribute in the request will not lead that the reference is removed, because of the Partial Updates feature. In this case, the attribute would just be ignored and not changed as part of the request.
+
+Composition Attributes
+In case you want to update a Composition attribute, it is possible to directly update the content of the child entity as part of the update request for the parent entity. This is true for 1:1 as well as 1:N compositions.
+
+The Update Entity endpoint will replace the existing composition collection with what is part of the request. Nested entities that are not part of the request will be removed from the data store.
+
+Also, make sure you pass the same set of attributes for all items of the composition. Attributes that are included for one entity but omitted for another will be assigned a null value in the latter entity.
+
+In this example, you will see how to update a 1:N composition between Order and OrderLine. Assuming that the stored Order before the update looks like this:
+
+Existing Order
+{
+  "id": "288a5d75-f06f-d150-9b70-efee1272b96c",
+  "date": "2021-03-01",
+  "amount": 130.08,
+  "lines": [
+    {
+      "id": "a1cd778b-fe49-4c74-05a0-6fb207dc11bd",  
+      "product": {
+        "id": "1860904a-5444-9c3e-9dc1-1d7a26d9ac19",
+        "name": "Solar-One HUP Flooded Battery 48V"
+      },
+      "quantity": 2.0,
+      "version": 1
+    },
+    {
+      "id": "55b925e5-9f3a-a725-9eb3-1240f9c1fe95",  
+      "product": {
+        "id": "1ed85c7a-89f1-c339-a738-16307ed6003a",
+        "name": "Cotek Battery Charger"
+      },
+      "quantity": 1.0,
+      "version": 1
+    }
+  ],
+  "version": 1,
+  "customer": {
+    "id": "f88597ff-009d-1cf2-4a90-a4fb5b08d835",
+    "name": "Randall Bishop"
+  }
+}
+The first order line references the Solar-One HUP Flooded Battery 48V product.
+The second order line references the Cotek Battery Charger product.
+In this example you would like to change the order lines in the following ways:
+
+The quantity of the Order Line with the product Solar-One HUP Flooded Battery 48V should be increased to 3.0.
+
+The order line with the product Cotek Battery Charger should be removed.
+
+A new order line with the product Outback Power Remote Power System should be added.
+
+Update Composition Request
+PUT http://localhost:8080/rest
+            /entities
+            /sample_Order
+            /288a5d75-f06f-d150-9b70-efee1272b96c
+            ?responseFetchPlan=product-with-tags
+
+{
+  "customer": {
+    "id": "f88597ff-009d-1cf2-4a90-a4fb5b08d835"
+  },
+  "date": "2021-03-01",
+  "amount": 249.99,
+  "lines": [
+    {
+      "id": "a1cd778b-fe49-4c74-05a0-6fb207dc11bd", 
+      "product": {
+        "id": "1860904a-5444-9c3e-9dc1-1d7a26d9ac19",
+        "name": "Solar-One HUP Flooded Battery 48V"
+      },
+      "quantity": 3.0 
+    },
+    { 
+      "product": {
+        "id": "f6884077-19c4-546f-33d4-a788399337f7",
+        "name": "Outback Power Remote Power System"
+      },
+      "quantity": 1.0
+    }
+  ]
+}
+The ID of the existing order line is added to update the existing order line
+The quantity value is set to 3.0 for the Solar-One HUP Flooded Battery 48V product
+A new order line is added for the product Outback Power Remote Power System
+When updating a child entity, like the order line in the example above, the ID of the existing order line needs to be added, so that Jmix recognizes it as an update. Otherwise, it would treat the child entity as a new entity.
+The response to this update request contains the desired changes:
+
+Response: 200 - OK
+{
+  "id": "288a5d75-f06f-d150-9b70-efee1272b96c",
+  "date": "2021-03-01",
+  "amount": 249.99,
+  "lines": [
+    {
+      "id": "d0fdfaa8-7d65-5e25-49c2-d34fc41c0e55",
+      "product": {
+        "id": "1860904a-5444-9c3e-9dc1-1d7a26d9ac19",
+        "name": "Solar-One HUP Flooded Battery 48V"
+      },
+      "quantity": 3.0, 
+      "version": 2 
+    },
+    {
+      "id": "96722466-5164-a48c-b7f6-8d4c1bd605dd",
+      "product": {
+        "id": "f6884077-19c4-546f-33d4-a788399337f7",
+        "name": "Outback Power Remote Power System" 
+      },
+      "quantity": 1.0
+    }
+  ],
+  "version": 2,
+  "customer": {
+    "id": "f88597ff-009d-1cf2-4a90-a4fb5b08d835",
+    "name": "Randall Bishop 3"
+  }
+}
+The quantity has been updated for Solar-One HUP Flooded Battery 48V.
+The version attribute was increased to indicate the update.
+The new order line for Outback Power Remote Power System has been added to the order.
+With this response, the order lines of the Order have been successfully updated.
+
+Security Constraints for Association/Composition
+As we learned above, the Update Entity endpoint will replace the existing association/composition collection with what is part of the request. For every entity reference that is not part of the request, the reference will be removed. Moreover, the entity that has been referenced before will be deleted from the application as well.
+
+Having that in mind, let’s see how this situation behaves when Jmix Row-level Security is active for an entity:
+
+Assuming you load an Order instance together with the nested collection of OrderLine instances.
+
+There are security constraints that filter out some OrderLine instances, so you don’t load them and don’t know they exist. Say line5 is not loaded by the client but exists in the database. If you update the Order and remove line2 from the order lines, there are two outcomes:
+
+If the constraints have not been changed since you loaded the entities, the framework restores the filtered line5 instance in the collection and deletes only line2, which is the correct behavior.
+
+If the constraints have been changed in a way that line5 is now available to you, the framework cannot restore the information about filtered collection elements correctly. As a result, both line2 and line5 will be deleted.
+
+You can eliminate possible data loss by sending a special system attribute in the JSON representing your entities. This attribute is called __securityToken and automatically included in resulting JSON if the jmix.core.entitySerializationTokenRequired application property is set to true.
+
+Once you receive this __securityToken as part of the load response of the Entity, you can pass the value on to the Update Entity request. Here is an example of entity JSON including security token:
+
+Request with Security Token
+{
+  "id": "fa430b56-ceb2-150f-6a85-12c691908bd1",
+  "lines": [
+    {
+      "id": "82e6e6d2-be97-c81c-c58d-5e2760ae095a",
+      "description": "Item 1"
+    },
+    {
+      "id": "988a8cb5-d61a-e493-c401-f717dd9a2d66",
+      "description": "Item 2"
+    }
+  ],
+  "__securityToken": "0NXc6bQh+vZuXE4Fsk4mJX4QnhS3lOBfxzUniltchpxPfi1rZ5htEmekfV60sbEuWUykbDoY+rCxdhzORaYQNQ==" 
+}
+The Security Token is the value that has been previously received by the Load Entities API.
+The __securityToken attribute contains encoded identifiers of filtered instances, so the framework can always restore the required information regardless of changes in constraints.
+
+Partial Updates
+It is possible to only send in the attributes that should be changed. In this case, all other attributes of the entity will stay untouched.
+
+In the example below, you can send in an updated order date of the Order entity. Although the Order entity contains more attributes like customer, amount, lines.
+
+Partial Order Update Request
+PUT http://localhost:8080
+         /entities
+         /sample_Order
+         /5a8adc2f-f4ef-17a9-9f97-1e715b3ade3d
+
+{
+  "date": "2020-12-06"
+}
+Response: 200 - OK
+{
+  "id": "5a8adc2f-f4ef-17a9-9f97-1e715b3ade3d",
+  "date": "2020-12-06", 
+  "amount": 130.08, 
+  "version": 2 
+}
+The date attribute was updated to the new order date.
+Other attributes of the entity stay untouched.
+The version attribute of the Order entity was increased to indicate the update.
+Bulk Update
+The Update-Entity API also allows you to update multiple entities within one request. For this, the JSON request body should contain an array of JSON objects representing each entity.
+
+Bulk Update Request
+PUT http://localhost:8080/rest
+            /entities
+            /sample_Customer
+
+[
+  {
+    "name": "Randall Bishop 2"
+  },
+  {
+    "name": "Sarah Doogle 2"
+  }
+]
+Response: 200 - OK
+[
+  {
+    "_entityName": "sample_Customer",
+    "_instanceName": "Randall Bishop 2",
+    "id": "833a610b-bc2c-2f44-c67a-2cf8b25f3291"
+  },
+  {
+    "_entityName": "sample_Customer",
+    "_instanceName": "Sarah Doogle 2",
+    "id": "c8ab5ae2-7f8f-bc68-fb58-6cfcf7b1d235"
+  }
+]
+In case of a violation of an entity validation, the entities will not be created, and a corresponding Error message will be returned. See Entity Validation for further details.
+
+
+Delete Entities
+The Entities API finally allows you to delete entities that should be removed from the application. The corresponding endpoint is once again: /entities/:entityName/:entityId using the HTTP method DELETE.
+
+Delete an Entity
+The following example removes a previously created Customer:
+
+Request
+DELETE http://localhost:8080/rest
+            /entities
+            /sample_Customer
+            /13f01f59-8e5f-4fd9-802b-66501d49ac99
+In case the entity exists, the response status 200 - OK is returned without any response body, and the entity is deleted from the application. In case the entity is not found, 404 - Not Found is returned.
+
+The Entities API takes Soft Deletion into consideration. Depending on the setting of the entity, the instance is either only soft-deleted or deleted entirely from the database.
+Bulk Delete
+The Delete-Entity API also allows you to delete multiple entities within one request. For this the JSON request body should contain an array of IDs representing each entity.
+
+Bulk Update Request
+DELETE http://localhost:8080/rest
+            /entities
+            /sample_Customer
+
+[
+  "3b9a1d43-1397-d2ae-eedd-f79eec1b81e2",
+  "20ba4218-6690-c14c-9453-9ccd4b0add37"
+]
+In case all entities could be deleted, the HTTP response code 200 - OK is returned.
+
+
+
+Files API
+This API uses the Files mechanism provided by Jmix and exposes it through the REST API to let client applications upload and download files to/from a Jmix application.
+
+Uploading Files
+The Upload Files API endpoint /files used with a POST HTTP method allows you to transfer a file to the Jmix application.
+
+There are two different ways of transferring the data:
+
+Using multipart/form-data
+
+Using different content types with the body containing the binary data
+
+Depending on the use case either of those two options might be a better fit. In both situations, the API returns 201 - Created to indicate that the file was successfully stored.
+
+To upload a file, the user must have a role with the rest.fileUpload.enabled specific policy.
+Using Multipart/form-data
+When using a standard browser form to submit the file to the Jmix application, the preferred way is to use the first option, as browsers by default use the Content-Type multipart/form-data in this case. The form data that contains the file binary needs to be named file so that Jmix takes this part as the file content.
+
+In this example you can see a multipart/form-data request, that uploads the file cat.jpg in its raw HTTP form:
+
+Upload File as Multipart/form-data Request
+POST http://localhost:8080/rest/files
+Content-Type: multipart/form-data; boundary=WebAppBoundary 
+
+--WebAppBoundary
+Content-Disposition: form-data; name="file"; filename="cat.jpg" 
+Content-Type: image/jpeg
+
+< ./cat.jpg 
+--WebAppBoundary--
+The Content-Type of the HTTP request is multipart/form-data
+The Content-Disposition part with the name file expresses the file to upload. The filename there as well.
+< ./cat.jpg stands for the binary data of the file (the actual binary content is not displayed here).
+Response: 201 - Created
+{
+  "fileRef": "fs://2021/03/12/a3b6011d-9040-151e-7d17-f7ccdf75d72f.jpg?name=cat.jpg", 
+  "name": "cat.jpg",
+  "size": 85862
+}
+The fileRef contains the reference for later use.
+In case you want to control the file name under which the file is stored, you can set the URL parameter name like this: POST http://localhost:8080/rest/files?name=dog.jpg. In this case, Jmix will pick up the filename from the parameter and not consider the Content-Disposition.
+
+To limit the uploaded file size use the following application property:
+
+spring.servlet.multipart.max-file-size=10MB
+Using Direct Upload
+It is also possible to upload a file without using the multipart/form-data content type. Instead, you can use the content type of the file directly. The body of the HTTP request contains the binary file content directly in this case. You need to provide the URL parameter name to indicate which filename to use for the file.
+
+In this example you can see how to use the Direct Request to upload a file:
+
+Upload File as Direct Request
+POST http://localhost:8080/rest/files?name=cat-via-direct-request.jpg 
+Content-Type: image/jpeg 
+
+< ./cat.jpg 
+The name URL parameter provides the filename to store.
+The Content-Type is the actual content type of the file.
+< ./cat.jpg stands for the binary data of the file (the actual binary content is not displayed here).
+Response: 201 - Created
+{
+  "fileRef": "fs://2021/03/12/2266c97c-cf23-c202-481d-04d972e185b4.jpg?name=cat-via-direct-request.jpg",
+  "name": "cat-via-direct-request.jpg",
+  "size": 85862
+}
+Downloading Files
+Files that are already uploaded in your Jmix application, can also be downloaded or displayed.
+
+For this you should use the Downloading Files endpoint: /files?fileRef=:fileRef via HTTP GET. The API returns 200 - OK if the file exists together with the file binary content as part of the HTTP body. Otherwise, 404 - Not Found is returned.
+
+In the following example the previously uploaded file is downloaded via the API:
+
+Download File Request
+GET http://localhost:8080/rest
+            /files
+            ?fileRef=fs://2021/03/12/2266c97c-cf23-c202-481d-04d972e185b4.jpg?name=cat-via-direct-request.jpg 
+fs://2021/03/12/2266c97c-cf23-c202-481d-04d972e185b4.jpg?name=cat-via-direct-request.jpg identifies the file by its reference.
+The fileRef parameter should always be URL encoded in order to prevent any issues special characters. So the actual URL from above should look like this when requested from the API:
+
+fileRef=fs%3A%2F%2F2021%2F03%2F12%2F2266c97c-cf23-c202-481d-04d972e185b4.jpg%3Fname%3Dcat-via-direct-request.jpg
+
+In case the file exists, the response will contain the file like below:
+
+Response: 200 - OK
+Content-Disposition: inline; filename="cat-via-direct-content-type.jpg" 
+Content-Type: image/jpeg 
+
+> ./cat-via-direct-content-type.jpg 
+The Content-Disposition Header contains the filename as well as information on how to handle the file after downloading (inline or attachment).
+The Content-Type Header contains the content type of the file.
+> ./cat-via-direct-content-type.jpg stands for the binary data of the file (the actual binary content is not displayed here).
+You can manage the Content-Disposition response header by setting the attachment request parameter. If it is set to true, then the response Content-Disposition will be set to attachment, inline value will be used otherwise.
+
+Attachment request parameter
+GET http://localhost:8080/rest
+            /files
+            ?fileRef=<your-file-ref>
+            &attachment=true
+The list of file extensions that can be downloaded with Content-Disposition: inline is set in the jmix.rest.inline-enabled-file-extensions application property.
+
+To download a file, the user must have a role with the rest.fileDownload.enabled specific policy.
+Referencing Files from Entities
+You can link files to entities after the file has been stored in the Jmix application.
+
+First, you need to upload the file as described in Uploading Files. In the response of the upload, a file reference like fs://2021/03/12/2266c97c-cf23-c202-481d-04d972e185b4.jpg?name=cat-via-direct-request.jpg is returned. You can use this reference when creating / updating entities and link them to the file.
+
+In the following example, the Product entity uses a file reference to store a product image.
+
+Product.java
+@JmixEntity
+@Table(name = "RSTEX11_PRODUCT")
+@Entity(name = "rstex11_Product")
+public class Product {
+
+    @PropertyDatatype("fileRef")
+    @Column(name = "IMAGE")
+    private FileRef image;
+
+    //...
+}
+When creating a Product via the Create Entities API, you need to pass in the previously received file reference as the value of the image attribute:
+
+Create Product with File Reference Request
+POST http://localhost:8080/rest
+            /entities
+            /rstex11_Product
+            ?responseFetchPlan=_local
+
+{
+  "name": "Product with Image",
+  "price":100,
+  "image": "fs://2021/03/13/f623e8ab-524e-51ed-1a9f-b1c1369239e3.jpg?name=cat.jpg"
+}
+Response: 201 - Created
+{
+  "id": "ea6f1b3c-0e74-c90b-b009-9f58ac964034",
+  "image": "fs://2021/03/13/f623e8ab-524e-51ed-1a9f-b1c1369239e3.jpg?name=cat.jpg",
+  "price": 100.00,
+  "name": "Product with Image"
+}
+
+
+Messages API
+When interacting with a frontend or mobile application, it is often needed to display localized messages of the application. As those translated values are already defined in the Jmix .messages files, the Messages API provides the ability to expose those values to the client application.
+
+The Messages API provides the following two endpoints:
+
+Entity Translations provides translations for Entities and Entity attributes.
+
+Enum Translations provides translations for Enums and its values.
+
+The Messages API by default uses the locale setting of the user obtaining the authorization token and returns the translated values accordingly.
+Entity Translations
+The Entity Translations endpoint allows retrieving information about the entity name, and the translated entity attribute names.
+
+/messages/entities
+Translation for the entity name and attributes of all entities.
+
+/messages/entities/:entityName
+Translation for the entity name and attributes of the given entity.
+
+In the following example, you can see how to request translated values for the Order entity through the API:
+
+Messages for Order Entity Request
+GET http://localhost:8080/rest
+            /messages
+            /entities
+            /rstex11_Order
+Response: 200 - OK
+{
+  "rstex11_Order": "Order",
+  "rstex11_Order.amount": "Amount",
+  "rstex11_Order.createdBy": "Created by",
+  "rstex11_Order.createdDate": "Created date",
+  "rstex11_Order.customer": "Customer",
+  "rstex11_Order.date": "Date",
+  "rstex11_Order.deletedBy": "Deleted by",
+  "rstex11_Order.deletedDate": "Deleted date",
+  "rstex11_Order.id": "Id",
+  "rstex11_Order.lastModifiedBy": "Last modified by",
+  "rstex11_Order.lastModifiedDate": "Last modified date",
+  "rstex11_Order.lines": "Lines",
+  "rstex11_Order.version": "Version"
+}
+Enum Translations
+The Enum Translations endpoint allows retrieving information about the enum name, and the translated enum values.
+
+/messages/enums
+Translation for the enum name and values of all enums.
+
+/messages/enums/:enumClassName
+Translation for the enum name and values of the given enum.
+
+The parameter enumClassName is the full qualified name of the enum including the package name. So use rest.sample.entity.CustomerType instead of just CustomerType.
+In the following example, you can see how to request translated values for the CustomerType enum through the API:
+
+Messages for CustomerType Request
+GET http://localhost:8080/rest
+            /messages
+            /enums
+            /rest.sample.entity.CustomerType
+Response: 200 - OK
+{
+  "rest.sample.entity.CustomerType": "CustomerType",
+  "rest.sample.entity.CustomerType.BUSINESS": "Business",
+  "rest.sample.entity.CustomerType.PRIVATE": "Private"
+}
+Request Specific Languages
+It is also possible to explicitly request translated messages for a given locale by setting the Accept-Language header. In the following example, you can see how to request German translations for the CustomerType enum:
+
+Language-specific Request
+GET http://localhost:8080/rest
+            /messages
+            /enums
+            /rest.sample.entity.CustomerType
+Accept-Language: de
+Response: 200 - OK
+{
+  "rest.sample.entity.CustomerType": "Kundentyp",
+  "rest.sample.entity.CustomerType.BUSINESS": "Geschäftskunde",
+  "rest.sample.entity.CustomerType.PRIVATE": "Privatkunde"
+}
+
+
+
+Metadata API
+It is possible to introspect the entity structure and relationships between entities in Jmix via the Metadata mechanism. You can access these capabilities through the REST API endpoints starting with /metadata
+
+The Metadata API consists of the following endpoints:
+
+Entity Metadata information about entities and entity attributes.
+
+Fetch Plans information about available Fetch Plans.
+
+Enum Values information about available Enums and their possible values.
+
+Entity Metadata
+The Entity Metadata API consists of two endpoints that allow retrieving information about the entity attributes:
+
+/metadata/entities
+Metadata descriptions for all entities
+
+/metadata/entities/:entityName
+Metadata descriptions of the given entity
+
+Order Entity Metadata Request
+GET http://localhost:8080/rest
+            /metadata
+            /entities
+            /rstex11_Order
+Response: 200 - OK
+{
+  "entityName": "rstex11_Order",
+  "ancestor": null,
+  "properties": [
+    {
+      "name": "date",
+      "attributeType": "DATATYPE",
+      "type": "localDate",
+      "cardinality": "NONE",
+      "mandatory": true,
+      "readOnly": false,
+      "description": "Date",
+      "persistent": true,
+      "transient": false
+    },
+    {
+      "name": "amount",
+      "attributeType": "DATATYPE",
+      "type": "decimal",
+      "cardinality": "NONE",
+      "mandatory": true,
+      "readOnly": false,
+      "description": "Amount",
+      "persistent": true,
+      "transient": false
+    },
+    {
+      "name": "id",
+      "attributeType": "DATATYPE",
+      "type": "uuid",
+      "cardinality": "NONE",
+      "mandatory": true,
+      "readOnly": false,
+      "description": "Id",
+      "persistent": true,
+      "transient": false
+    },
+    {
+      "name": "lines",
+      "attributeType": "COMPOSITION",
+      "type": "rstex11_OrderLine",
+      "cardinality": "ONE_TO_MANY",
+      "mandatory": false,
+      "readOnly": false,
+      "description": "Lines",
+      "persistent": true,
+      "transient": false
+    },
+    {
+      "name": "customer",
+      "attributeType": "ASSOCIATION",
+      "type": "rstex11_Customer",
+      "cardinality": "MANY_TO_ONE",
+      "mandatory": true,
+      "readOnly": false,
+      "description": "Customer",
+      "persistent": true,
+      "transient": false
+    }
+  ]
+}
+Fetch Plans
+The Fetch Plan Metadata API exposes information of the structure of the available fetch plans for a given entity. It consists of the two endpoints:
+
+/metadata/entities/:entityName/fetchPlans
+All available fetch plans of the given entity
+
+/metadata/entities/:entityName/fetchPlans/:fetchPlanName
+Information about a particular fetch plan
+
+In the following example all fetch plans are requested for the rstex11_Order entity:
+
+Available Order Fetch Plans Request
+GET http://localhost:8080/rest
+            /metadata
+            /entities
+            /rstex11_Order
+            /fetchPlans
+Response: 200 - OK
+[
+  {
+    "name": "order-with-details",
+    "entity": "rstex11_Order",
+    "properties": [
+      "date",
+      "amount",
+      "createdDate",
+      "createdBy",
+      "lastModifiedDate",
+      "deletedDate",
+      "lastModifiedBy",
+      "id",
+      "version",
+      "deletedBy",
+      "customer",
+      {
+        "name": "lines",
+        "fetchPlan": {
+          "name": "_base",
+          "properties": [
+            "quantity",
+            "createdDate",
+            "createdBy",
+            "lastModifiedDate",
+            "deletedDate",
+            "lastModifiedBy",
+            "id",
+            "version",
+            "deletedBy",
+            {
+              "name": "product",
+              "fetchPlan": {
+                "name": "_instance_name",
+                "properties": [
+                  "name"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
+Enum Values
+The Enum Metadata API provides information about possible values for Enums.
+
+/metadata/enums
+Names and values of all enums
+
+/metadata/enums/:enumClassName
+Names and values of a given enum
+
+The parameter :enumClassName should contain the full qualified class name of the enum. Example: rest.sample.entity.CustomerType instead of just CustomerType.
+In the following example information about the rest.sample.entity.CustomerType enum is requested:
+
+Enum Values Request
+GET http://localhost:8080/rest
+            /metadata
+            /enums
+            /rest.sample.entity.CustomerType
+Response: 200 - OK
+{
+  "name": "rest.sample.entity.CustomerType",
+  "values": [
+    {
+      "name": "BUSINESS",
+      "id": "BUSINESS",
+      "caption": "Business"
+    },
+    {
+      "name": "PRIVATE",
+      "id": "PRIVATE",
+      "caption": "Private"
+    }
+  ]
+}
+
+
+
+User Session API
+The User Session API consists of the following two endpoints:
+
+User Info Information about current user.
+
+Permissions Information about entity permissions that the current user has obtained.
+
+User Info
+The User Info Endpoint allows you to fetch information about the current user: GET /userInfo returns 200 - OK with the following information:
+
+Response: 200 - OK
+{
+  "username": "admin",
+  "locale": "en"
+}
+Permissions
+The /permissions endpoint allows you to retrieve information about current user’s permissions on entities and entity attributes.
+
+The returned entities array contain a list of targets for the CRUD operations on entities like sample_Customer:read with a value describing the corresponding permission:
+
+Table 1. Entity Values
+Value	Permission
+0
+
+Operation Forbidden
+
+1
+
+Operation Allowed
+
+The entityAttributes array contains a list of targets for each entity attribute with a value describing the corresponding permission:
+
+Table 2. Entity Attribute Values
+Value	Permission
+0
+
+Entity Attribute hidden
+
+1
+
+Entity Attribute read allowed
+
+2
+
+Entity Attribute modify allowed
+
+In the following example the permissions are requested for a user that has the following constraints:
+
+The user has full access to the Customer entity.
+
+The user has only read access to the Product entity, except for the tags attribute, which is hidden.
+
+Fetch Permissions Request
+GET http://localhost:8080/rest
+            /permissions
+Response: 200 - OK
+{
+  "entities": [
+    {
+      "target": "rstex11_Customer:create",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Customer:read",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Customer:update",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Customer:delete",
+      "value": 0
+    },
+    {
+      "target": "rstex11_Product:create",
+      "value": 0
+    },
+    {
+      "target": "rstex11_Product:read",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Product:update",
+      "value": 0
+    },
+    {
+      "target": "rstex11_Product:delete",
+      "value": 0
+    }
+  ],
+  "entityAttributes": [
+    {
+      "target": "rstex11_Customer:name",
+      "value": 2
+    },
+    {
+      "target": "rstex11_Customer:type",
+      "value": 2
+    },
+    {
+      "target": "rstex11_Product:image",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Product:price",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Product:name",
+      "value": 1
+    },
+    {
+      "target": "rstex11_Product:tags",
+      "value": 0
+    }
+  ]
+}
+
+
+
+
+Capabilities API
+The Capabilities API provides information about features supported by this generic REST API.
+
+GET /capabilities returns 200 - OK and a JSON object with the following properties:
+
+inlineFetchPlans: if true, then arbitrary fetch plans are enabled. Otherwise, a client can pass only named fetch plans.
+
+
+
+Business Logic
+When interacting with the REST API it is oftentimes needed to have an application-level layer of business logic in place that represents the invocation point for the API. It can be used for orchestration, validation, or other tasks that should happen when the API client interacts with the system. The Entities API does not allow placing additional orchestration business logic when interacting with the API. Instead, the API client directly interacts with the Data Access Layer of Jmix.
+
+For exposing business logic to the API client, Jmix provides two ways:
+
+Services API
+
+Custom controllers
+
+In the next section, we will take a look at both options to understand where the difference between those approaches is.
+
+Services API
+Let’s look at the first approach to expose business logic to the API client: the Services API.
+
+The Services API allows exposing an arbitrary Spring bean as an HTTP endpoint. In this case, Jmix will take care of the HTTP interactions like providing HTTP response codes, perform error handling, etc.
+
+In this overview you can see the interaction between the API client and the Jmix application when using the Services API:
+
+business logic diagram
+Exposing a Service
+To use a Spring bean as part of the Jmix Services API, it needs to meet one of the following conditions:
+
+Annotation-Based Approach: The Spring bean must be created using the @RestService annotation-based method.
+
+XML-based Approach: The Spring bean must fulfill these criteria:
+
+The Spring bean needs to be annotated with Spring’s @Service annotation (a specialized version of the @Component annotation).
+
+The Spring bean needs to be registered in the rest-services.xml configuration file.
+
+Let’s examine these two methods in more detail.
+
+Using Annotations
+Create the Spring bean and annotate it with the @RestService annotation.
+
+import io.jmix.rest.annotation.RestMethod;
+import io.jmix.rest.annotation.RestService;
+
+import java.math.BigDecimal;
+
+@RestService("sample_OrderService") 
+public class OrderService {
+
+    @RestMethod 
+    public BigDecimal calculateTotalAmount(int orderId) {
+        // ...
+    }
+}
+The @RestService annotation is used to mark a service class that should be accessible through a REST API.
+The @RestMethod annotation is used to configure the mapping between a service method and a specific REST endpoint. You can pass the httpMethods parameter, which accepts a list of possible HTTP methods for invoking services through the Generic REST API. By default, it includes GET and POST.
+Using rest-services.xml
+Let’s look at the first part with this example:
+
+CalculationServiceBean.java
+import org.springframework.stereotype.Service;
+
+@Service("sample_OrderService") 
+public class OrderService {
+
+    public BigDecimal calculateTotalAmount(int orderId) {
+        // ...
+    }
+}
+The OrderServiceBean is registered as the Spring @Service with the name sample_OrderService.
+If the service name is not specified explicitly in the annotation, it is assumed to be equal to the simple class name with the first letter in lowercase. In the example above it would be orderService.
+The second part is to mention all Service methods as API endpoints. This happens via an XML configuration file, normally called rest-services.xml. You need to create this new file in your Jmix application as part of src/main/resources. It lists all service methods with information about the parameters that you want to expose.
+
+rest-services.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<services xmlns="http://jmix.io/schema/rest/services">
+    <service name="sample_OrderService"> 
+        <method name="calculateTotalAmount"> 
+            <param name="orderId"/> 
+        </method>
+    </service>
+</services>
+You register the Service by its Spring component name.
+Each method that you want to expose needs to be mentioned here.
+The parameter needs to be described by its name and optionally by its type.
+After the file has been created, and the services have been defined, the last part is to register the rest-services.xml configuration in the application.properties of your Jmix application:
+
+application.properties
+jmix.rest.services-config = rest-services.xml
+The value of the serviceConfig is a reference to the file within the classpath. In this case, the file is located directly in the classpath root under src/main/resources. If you for example put the file in the src/resources/com/example/rest-services.xml package, the value would be: com/example/rest-services.xml.
+Using the Services API
+Once we have exposed the Service through the Services API, you can invoke it from an API client. This is possible by HTTP GET or HTTP POST.
+
+Invoke a Service via GET
+In the case of HTTP GET, you need to provide the method parameter values as URL query parameters:
+
+Calculate Total Order Amount via HTTP GET
+GET http://localhost:8080/rest
+            /services
+            /sample_OrderService
+            /calculateTotalAmount?orderId=123
+Authorization: Bearer {{access_token}}
+Response: 200 - OK
+450.0
+When using GET for invoking a service through the Services API, the OAuth access token still needs to be provided by the HTTP Authorization header. It is not possible to append the access token as a URL query parameter.
+A service method may return a result of a simple data type, an entity, an entity collection, or a serializable POJO. In our case, the service method returns an int, so the response body contains just a number.
+
+Invoke a Service via POST
+Alternatively, it is also possible to invoke the Service via HTTP POST. This is in particularly useful, when the Service method has one of the following parameter types:
+
+Entities
+
+Entity Collections
+
+Serializable POJOs
+
+Suppose we added a new method to the OrderService created in the previous part:
+
+OrderServiceBean.java
+@Service("sales_OrderService")
+public class OrderService {
+
+    public OrderValidationResult validateOrder(Order order, Date validationDate){
+        OrderValidationResult result = new OrderValidationResult();
+        result.setSuccess(false);
+        result.setErrorMessage("Validation of order " + order.getNumber() + " failed. validationDate parameter is: " + validationDate);
+        return result;
+    }
+}
+With the following structure for the OrderValidationResult POJO as the result object:
+
+OrderValidationResult.java
+import java.io.Serializable;
+
+public class OrderValidationResult implements Serializable {
+
+    private boolean success;
+
+    private String errorMessage;
+
+    public boolean isSuccess() {
+        return success;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+}
+The new method has an Order entity in the arguments list and returns a POJO. Before the invocation of the REST API, the new method also must be registered in the rest-services.xml. Once you exposed the method you can perform the API call:
+
+Invoke Order Validation via HTTP POST
+POST http://localhost:8080/rest/services/sales_OrderService/validateOrder
+
+{
+  "order" : {
+    "number": "00050",
+    "date" : "2016-01-01"
+  },
+  "validationDate": "2016-10-01"
+}
+The REST API method returns a serialized OrderValidationResult POJO:
+
+Response: 200 - OK
+{
+  "success": false,
+  "errorMessage": "Validation of order 00050 failed. validationDate parameter is: 2016-10-01"
+}
+Service Parameter Formats
+Parameter values must be passed in a format defined for the corresponding datatype.
+
+If the parameter type is java.util.Date, then the value is handled by DateTimeDatatype. This datatype implementation uses the ISO_DATE_TIME format where the date and time parts are separated with T, for example 2011-12-03T10:15:30.
+
+Parameters of java.sql.Date type are handled by DateDatatype which uses ISO_DATE format, for example 2011-12-03.
+
+Parameters of java.sql.Time type are handled by TimeDatatype which uses ISO_TIME format, for example 10:15:30.
+
+Using DTOs as Request Parameters
+When using a structured request object as a method parameter, the JSON request body must include the parameter name as the top-level key.
+
+Example:
+
+public Owner registerOwner(OwnerRegistration registration) {
+    return dataManager.create(Owner.class);
+}
+With the following DTO definition:
+
+public record OwnerRegistration(String firstName, String lastName) {}
+The request must follow this structure:
+
+{
+  "registration": {
+    "firstName": "John",
+    "lastName": "Doe"
+  }
+}
+Instead of using POJOs as parameter objects, it is recommended to use DTO Entities. This provides several advantages like correct OpenAPI Schema Generation and better support for Bean Validation to validate the request parameters.
+
+Custom Controller
+The second way of exposing business logic as an API is the ability to use custom HTTP controllers. The main difference is that in this case, it is also possible to influence the HTTP interactions (like status codes, security, etc.) on your own. Jmix uses the default mechanisms from Spring MVC for creating HTTP endpoints.
+
+Use-cases for custom controllers could be:
+
+explicitly define HTTP status codes
+
+use other request & response content type than JSON
+
+set custom response headers (e.g. for caching)
+
+create custom error messages from exceptions
+
+In these situations, the generic Services API might be not flexible enough to accomplish your goals. Therefore Jmix allows natively integrate Spring MVC controllers into a Jmix application.
+
+Creating Custom Controllers
+To create a Spring MVC controller, it is only required to create a Spring bean in the Jmix application annotated as a Spring MVC controller. Jmix itself does not have any further requirements over Spring MVC. Let’s look at an example Controller:
+
+OrderController.java
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
+
+@RestController 
+@RequestMapping("/orders")  
+public class OrderController {
+    // ...
+}
+The custom controller is marked as @RestController to indicate to Spring that this bean contains HTTP endpoints.
+The request mapping defines the base path for this Controller.
+Now that the Spring controller is registered, we can create a method exposing a particular HTTP endpoint with it:
+
+OrderController.java
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@RestController
+@RequestMapping("/orders")
+public class OrderController {
+
+    @GetMapping("/calculateTotalAmount") 
+    public ResponseEntity<OrderTotalAmount> calculateTotalAmount(
+            @RequestParam int orderId  
+    ) {
+
+        BigDecimal totalAmount = orderService.calculateTotalAmount(orderId);
+
+        return ResponseEntity 
+                .status(HttpStatus.OK)
+                .header(HttpHeaders.CACHE_CONTROL, "max-age=31536000")
+                .body(new OrderTotalAmount(totalAmount, orderId));
+
+    }
+}
+The method calculateTotalAmount is annotated with @GetMapping indicating that it is accessible via HTTP GET on the subpath /calculateTotalAmount.
+The parameter orderId is retrieved via URL query parameters.
+We can use Spring’s ResponseEntity class to indicate a JSON response together with different HTTP aspects.
+More detailed information on the various aspects of how to create Spring MVC controllers can be found in the Spring guide: Building a RESTful Web Service as well as the reference documentation for Spring MVC.
+
+With that controller in place, Jmix can serve this HTTP endpoint. Let’s have a look at how to interact with the controller:
+
+Invoke Custom Orders Controller
+GET http://localhost:8080/orders/calculateTotalAmount?orderId=123
+The result contains the calculation result exposed as JSON as well as the defined HTTP headers:
+
+Response: 200 - OK
+HTTP/1.1 200
+Cache-Control: max-age=31536000
+Content-Type: application/json
+
+{
+  "orderId": 123,
+  "totalAmount": 450.0
+}
+Securing Custom Controllers
+To secure a custom controller via the same OAuth2 mechanism that the other parts of the Jmix REST APIs use, register the controller’s URL pattern in the jmix.resource-server.authenticated-url-patterns application property:
+
+application.properties
+jmix.resource-server.authenticated-url-patterns = /rest/**,/orders/**
+Here, the /orders/** wildcard indicates to Jmix that all endpoints that start with /orders/ should also use the OAuth2 mechanism.
+
+The value can contain a comma-separated list of Apache Ant style URL patterns.
+Trying to invoke the Order Controller now without a valid OAuth2 token will result in an HTTP 401 - Unauthorized:
+
+Response: 401 - Unauthorized
+HTTP/1.1 401
+WWW-Authenticate: Bearer realm="oauth2-resource", error="unauthorized", error_description="Full authentication is required to access this resource"
+
+{
+"error": "unauthorized",
+"error_description": "Full authentication is required to access this resource"
+}
+Authenticated endpoints can rely on data access control provided by the Jmix security subsystem. If your controller uses DataManager to load or save data, it will check rights of the authenticated user on entity operations. In the following example, the "Access denied" exception will be thrown if the user has no rights to read the Order entity:
+
+@RestController
+@RequestMapping("/orders")
+public class OrderController {
+
+    @Autowired
+    private DataManager dataManager;
+
+    @GetMapping("/all")
+    public List<Order> loadAll() {
+        return dataManager.load(Order.class).all().list();
+    }
+If you want to limit access also to entity attributes, use the EntitySerialization bean for serializing entities returned from the endpoint. In the following example, only attributes, permitted by the entity attribute policy will be returned in JSON to the client:
+
+@RestController
+@RequestMapping("/orders")
+public class OrderController {
+
+    @Autowired
+    private DataManager dataManager;
+    @Autowired
+    private EntitySerialization entitySerialization;
+
+    @GetMapping("/all")
+    public String loadAll() {
+        List<Order> orders = dataManager.load(Order.class).all().list();
+        return entitySerialization.toJson(
+                orders,
+                null,
+                EntitySerializationOption.DO_NOT_SERIALIZE_DENIED_PROPERTY
+        );
+    }
+
+
+
+
+CORS
+For security reasons, browsers don’t allow JavaScript network calls to resources outside the current origin. Cross-Origin Resource Sharing or CORS solves this restriction, as it lets you specify which cross-domain requests are allowed.
+
+By default, all cross-origin requests to the REST API are allowed. To restrict the origins list you can define the jmix.cors.allowed-origins application property and other CORS properties.
+
+CORS settings are automatically applied to the following URLs:
+
+/oauth2/**
+
+URL patterns defined in jmix.resource-server.authenticated-url-patterns property.
+
+In order to replace the default CORS configuration provided by Jmix, register a bean with the corsConfigurationSource name in your project. In this case, the properties mentioned above will not work.
+
+Refer to Spring Security Documentation for more information on CORS.
+
+
+API Documentation
+Jmix REST provides automatically generated API documentation in the OpenAPI Specification format.
+
+You can use the API documentation to visualize, test, or generate a client code for the REST API using tools like Postman or Swagger.
+
+By default, the documentation endpoints described below require authentication. To make them available without authentication, set the jmix.resource-server.anonymous-url-patterns application property:
+
+jmix.resource-server.anonymous-url-patterns = /rest/docs/*
+Generic OpenAPI Documentation
+The generic OpenAPI documentation contains descriptions for all endpoints the REST API provides. In particular, it contains API descriptions for the following parts:
+
+Authentication
+
+Entities API
+
+Files API
+
+Metadata API
+
+Messages API
+
+User Session API
+
+The Generic OpenAPI Documentation is available in JSON and YAML formats:
+
+/docs/openapi.json
+JSON version of generic documentation.
+
+/docs/openapi.yaml
+YAML version of generic documentation.
+
+For example:
+
+curl -X GET http://localhost:8080/rest/docs/openapi.json \
+    -H "Authorization: Bearer <access_token>"
+curl -X GET http://localhost:8080/rest/docs/openapi.yaml \
+    -H "Accept: application/yaml" \
+    -H "Authorization: Bearer <access_token>"
+A static version of the documentation is available online at https://docs.jmix.io/openapi/2.6
+Project-specific OpenAPI Documentation
+Any running Jmix application also automatically generates project-specific documentation. Project-specific means that it contains documentation not only about the standard APIs that are part of Jmix, but also about your project-specific entities, like User, Customer, Order, etc.
+
+The project-specific OpenAPI Documentation is available in the formats JSON and YAML:
+
+/docs/openapiDetailed.json
+JSON version of project-specific OpenAPI documentation.
+
+/docs/openapiDetailed.yaml
+YAML version of project-specific OpenAPI documentation.
+
+For example:
+
+curl -X GET http://localhost:8080/rest/docs/openapiDetailed.json \
+    -H "Authorization: Bearer <access_token>"
+curl -X GET http://localhost:8080/rest/docs/openapiDetailed.yaml \
+    -H "Accept: application/yaml" \
+    -H "Authorization: Bearer <access_token>"
+    
+    
+    
+    REST Properties
+Jmix REST properties allow you to configure different aspects of the behavior of the generic REST endpoints.
+
+Entities API
+jmix.rest.default-max-fetch-size
+Defines the default maximum amount of entity instances that are returned by the API.
+
+Default value: 10000
+
+jmix.rest.entity-max-fetch-size
+Defines the default maximum amount of entity instances that are returned by the API for a particular entity.
+
+The following example configures the entityMaxFetchSize value for two entities. For all other entities the value from jmix.rest.default-max-fetch-size is used.
+
+jmix.rest.entity-max-fetch-size.sample_Product = 500
+jmix.rest.entity-max-fetch-size.sample_Customer = 1000
+jmix.rest.inline-enabled-file-extensions
+The list of file extensions that can be downloaded with Content-Disposition: inline header.
+
+Default value: jpg,png,jpeg,pdf
+
+jmix.rest.inline-fetch-plan-enabled
+If set to false, Inline Fetch Plans are refused by all REST endpoints.
+
+Default value: true
+
+jmix.rest.json-transformation-config
+Property defining a file that contains a list of JSON transformations configurations used by the REST API when the client needs data in the format of some particular data model version.
+
+The file is loaded using the Resources interface, so it can be located in the classpath or the configuration directory.
+
+Default value: none
+
+jmix.rest.max-upload-size
+Maximum file size (in bytes) that can be uploaded with the REST API.
+
+The file is loaded using the Resources interface, so it can be located in the classpath or the configuration directory.
+
+Default value: 20971520 (20 Mb)
+
+jmix.rest.optimistic-locking-enabled
+Enables optimistic locking of entities with optimistic locking if the version attribute is provided in JSON.
+
+Default value: false
+
+jmix.rest.queries-config
+Property defining a file that contains a list of JPQL queries available as part of the Entities API.
+
+jmix.rest.queries-config = rest/sample/rest-queries.xml
+The file is loaded using the Resources interface, so it can be located in the classpath or the configuration directory.
+
+Default value: none
+
+jmix.rest.services-config
+Property defining a file that contains a list of Service methods that are exposed via the Services API.
+
+jmix.rest.services-config = rest/sample/rest-services.xml
+The file is loaded using the Resources interface, so it can be located in the classpath or the configuration directory.
+
+Default value: none
+
+jmix.rest.response-fetch-plan-enabled
+If set to true, the responseFetchPlan parameter with the fetch plan name can be passed in the create and update requests. In this case, the created/updated entity is reloaded with the specified fetch plan and returned as part of the response JSON.
+
+If set to false, the response contains JSON with a minimal representation of the created/updated entity.
+
+Default value: true
+
+Paths
+jmix.rest.base-path
+Base path of all generic REST endpoints.
+
+Default value: /rest
+
+jmix.rest.entities-path
+Path to the Entities API endpoints.
+
+Default value: /entities
+
+jmix.rest.docs-path
+Path to the API Documentation endpoints.
+
+Default value: /docs
+
+jmix.rest.metadata-path
+Path to the Metadata API endpoints.
+
+Default value: /metadata
+
+jmix.rest.files-path
+Path to the Files API endpoints.
+
+Default value: /files
+
+jmix.rest.messages-path
+Path to the Messages API endpoints.
+
+Default value: /messages
+
+jmix.rest.permissions-path
+Path to the Permissions endpoint.
+
+Default value: /permissions
+
+jmix.rest.queries-path
+Path to the endpoint for loading entities via JPQL.
+
+Default value: /queries
+
+jmix.rest.services-path
+Path to the Services API endpoints.
+
+Default value: /services
+
+jmix.rest.user-info-path
+Path to the User Info endpoint.
+
+Default value: /userInfo
+
+jmix.rest.capabilities
+Path to the Capabilities API endpoints.
+
+Default value: /capabilities
+
+Security
+See Security: Custom Endpoints section for information on application properties affecting REST endpoints.
+
+
+
+REST DataStore
+The purpose of the REST data store is to provide an easy way of integrating Jmix applications. The result of the integration is the ability to access external entities from a remote Jmix application through the DataManager interface in the same way as local JPA entities. The external entities can be displayed in UI, updated and saved back to the remote application using the standard CRUD functionality provided by Jmix, without writing any specific code.
+
+This document provides reference information about the REST DataStore add-on. If you want to learn more about how to use it in various scenarios, refer to the following guides:
+
+Integrating Jmix Applications
+
+Separating Application Tiers
+
+REST DataStore with External Authentication
+
+In this document, we will use the following terms:
+
+Service Application - a Jmix application providing data through the generic REST API.
+
+Client Application - a Jmix application consuming data from the Service Application using the REST data store.
+
+The service and client applications can use different versions of Jmix.
+
+Installation
+For automatic installation through Jmix Marketplace, follow instructions in the Add-ons section.
+
+For manual installation, add the following dependencies to your build.gradle:
+
+implementation 'io.jmix.restds:jmix-restds-starter'
+Configuration
+Basic Configuration
+The basic configuration includes the steps listed below.
+
+In the service application project:
+
+Add REST API and Authorization Server add-ons.
+
+Set up Client Credentials grant for a client.
+
+In the client application project:
+
+Add the REST DataStore add-on as described above.
+
+Add an additional data store with restds_RestDataStoreDescriptor descriptor, for example:
+
+jmix.core.additional-stores=serviceapp
+jmix.core.store-descriptor-serviceapp=restds_RestDataStoreDescriptor
+Specify service connection properties for the data store by its name, for example:
+
+serviceapp.baseUrl=http://localhost:8081
+serviceapp.clientId=clientapp
+serviceapp.clientSecret=clientapp123
+Authentication With Password Grant
+If you want to authenticate real users in the service application as demonstrated in Separating Application Tiers guide, set up the Password Grant in the service application and add the following properties to the client application:
+
+serviceapp.authenticator=restds_RestPasswordAuthenticator
+jmix.restds.authentication-provider-store=serviceapp
+[datastore-name].authenticator property defines the name of a bean that implements the RestAuthenticator interface and is used to authenticate requests to the REST API.
+
+The restds_RestPasswordAuthenticator bean retrieves access and refresh tokens from the service application when the user logs in, saves the tokens in the user session and uses them for authenticating further requests to the service’s REST API.
+
+The jmix.restds.authentication-provider-store property is required for configuring the Spring Security’s AuthenticationProvider which uses restds_RestPasswordAuthenticator during the user authentication process. The value of this property must contain the name of the corresponding REST DataStore.
+
+External Authentication
+If you want to use an external authentication provider (for example Keycloak) instead of the Jmix Authorization Server, remove the Authorization Server add-on from the project and add the OpenID Connect add-on.
+
+Define the following application properties:
+
+serviceapp.authenticator=restds_RestOAuth2ClientAuthenticator
+serviceapp.oauth2-client-registration=keycloak
+[datastore-name].authenticator property defines the name of a bean that implements the RestAuthenticator interface and is used to authenticate requests to the REST API.
+
+The restds_RestOAuth2ClientAuthenticator bean uses the OAuth2 token of the current user.
+
+[datastore-name].oauth2-client-registration defines the Spring Security OAuth2 client registration ID which is used in the spring.security.oauth2.client.registration.[ID] properties for connecting to an OIDC provider.
+
+For example, if you connect to Keycloak using this property:
+
+spring.security.oauth2.client.registration.keycloak.client-id=integrated-apps-client
+Then the [datastore-name].oauth2-client-registration property value should be keycloak.
+
+See the complete example in the REST DataStore with External Authentication guide.
+
+UI User Settings
+To save UI user settings and filter configurations through the REST data store, do the following:
+
+In build.gradle:
+
+add io.jmix.flowui:jmix-flowui-restds-starter dependency
+
+remove io.jmix.flowui:jmix-flowui-data-starter dependency
+
+In application.properties, specify the name of the REST data store in the jmix.restds.ui-config-store property, for example:
+
+jmix.restds.ui-config-store=serviceapp
+See Frontend Application Configuration in the Separating Application Tiers guide for more information.
+
+REST API Paths
+If the REST API endpoints have non-standard paths, you can configure access to them using the application properties shown below. The properties start from the data store name (serviceapp in this example):
+
+serviceapp.basePath=/rest
+serviceapp.entitiesPath=/entities
+serviceapp.userInfoPath=/userInfo
+serviceapp.permissionsPath=/permissions
+serviceapp.capabilitiesPath=/capabilities
+Data Model
+The client application should contain DTO entities that are equivalent to service entities. In order to be automatically mapped, the attributes of the entities must match by name and type.
+
+The set of attributes may be different. For example, a service entity may have more attributes than a client entity. Attributes that are not present in an entity on the other side will have null values after data transfer.
+
+The client DTO entity must have the @Store annotation specifying the additional data store.
+
+The following example demonstrates the Region entity definition in the service and client applications.
+
+Region entity in service application
+@JmixEntity
+@Table(name = "REGION")
+@Entity
+public class Region {
+    @JmixGeneratedValue
+    @Column(name = "ID", nullable = false)
+    @Id
+    private UUID id;
+
+    @Column(name = "VERSION", nullable = false)
+    @Version
+    private Integer version;
+
+    @InstanceName
+    @Column(name = "NAME", nullable = false)
+    @NotNull
+    private String name;
+
+    // getters and setters
+Region entity in client application
+@Store(name = "serviceapp")
+@JmixEntity
+public class Region {
+    @JmixGeneratedValue
+    @JmixId
+    private UUID id;
+
+    private Integer version;
+
+    @InstanceName
+    @NotNull
+    private String name;
+
+    // getters and setters
+If the client entity name differs from the service one, use the @RestDataStoreEntity annotation to specify the service entity name explicitly. For example:
+
+@Store(name = "serviceapp")
+@JmixEntity
+@RestDataStoreEntity(remoteName = "Region")
+public class RegionDto {
+    // ...
+For embedded attributes on the client side use the @JmixEmbedded annotation instead of JPA’s @Embedded.
+
+For one-to-many composition attributes on the client side define the inverse attribute in the @Composition annotation.
+
+For example:
+
+@Store(name = "serviceapp")
+@JmixEntity
+public class Customer {
+    // ...
+
+    @JmixEmbedded
+    @EmbeddedParameters(nullAllowed = false)
+    private Address address;
+
+    @Composition(inverse = "customer")
+    private Set<Contact> contacts;
+
+    // ...
+Fetch Plans
+When you load an external entity in the client application, you can specify a fetch plan to load references.
+
+If the service application is built with Jmix before version 2.5, its generic REST API supports only named fetch plans defined in fetch plans repository. So the REST data store will request data from the service providing a fetch plan name. Therefore, both service and client applications must define all fetch plans in their fetch plan repositories, with corresponding names.
+
+Since Jmix 2.5, generic REST supports inline fetch plans, if this feature is not disabled by the jmix.rest.inline-fetch-plan-enabled property. So you can define fetch plans in your client’s view XML and Java code the same as when working with databases.
+
+The REST data store relies on the Capabilities API of the service application REST to determine if inline fetch plans are enabled. If the check confirms their availability, the REST data store passes inline fetch plans, otherwise it passes only names of the fetch plans.
+
+Loaded State
+If a fetch plan does not include an attribute, that attribute is not loaded. Unlike JPA entity attributes, the attributes of REST entities that are not loaded have a null value and do not throw any exceptions when accessed.
+
+When updating an entity, the REST data store only saves loaded attributes. If an attribute was not loaded from the service but changed from null to some value afterwards, it is considered loaded and the new value is therefore saved.
+
+The EntityStates.isLoaded(entity, property) method correctly returns information about whether a particular attribute of a REST entity is loaded.
+
+Filtering Loaded Data
+This section describes the filtering options supported when loading external entities using DataManager. All of these options lead to invoking the REST API search endpoint of the service application, so only the resulting entities are transferred over the wire.
+
+By Conditions
+For example:
+
+List<Customer> loadByCondition(String lastName) {
+    return dataManager.load(Customer.class)
+            .condition(PropertyCondition.equal("lastName", lastName))
+            .list();
+}
+By Query
+The query is a JSON expression supported by generic REST in the search endpoint:
+
+List<Customer> loadByQuery(String lastName) {
+    String query = """
+    {
+      "property": "lastName",
+      "operator": "=",
+      "value": "%s"
+    }
+    """.formatted(lastName);
+
+    return dataManager.load(Customer.class)
+            .query(query)
+            .list();
+}
+By Identifiers
+For example:
+
+List<Customer> loadByIdentifiers(UUID id1, UUID id2, UUID id3) {
+    return dataManager.load(Customer.class)
+            .ids(id1, id2, id3)
+            .list();
+}
+Using Query in View XML
+The JSON query can be specified in view XML descriptors for data containers and itemsQuery elements:
+
+<entityComboBox id="regionField" property="region">
+    <itemsQuery class="com.company.clientapp.entity.Region"
+                searchStringFormat="${inputString}">
+        <fetchPlan extends="_base"/>
+        <query>
+            <![CDATA[
+            {
+              "property": "name",
+              "operator": "contains",
+              "parameterName": "searchString"
+            }
+            ]]>
+        </query>
+    </itemsQuery>
+</entityComboBox>
+To specify a parameter instead of a literal value in JSON query conditions, use parameterName key instead of value as shown above. The REST data store will substitute this property with "value": <parameter-value> in the resulting request.
+
+The dataLoadCoordinator facet can also be used, but only with manual configuration. In the following example, the regionsDc and customersDc data containers are linked using a JSON query and dataLoadCoordinator to provide a master-detail list of regions and customers for the selected region:
+
+<data>
+    <collection id="regionsDc"
+                class="com.company.clientapp.entity.Region">
+        <loader id="regionsDl" readOnly="true"/>
+    </collection>
+    <collection id="customersDc" class="com.company.clientapp.entity.Customer">
+        <fetchPlan extends="_base"/>
+        <loader id="customersDl" readOnly="true">
+            <query>
+                <![CDATA[
+                {
+                    "property": "region",
+                    "operator": "=",
+                    "parameterName": "region"
+                }
+                ]]>
+            </query>
+        </loader>
+    </collection>
+</data>
+<facets>
+    <dataLoadCoordinator>
+        <refresh loader="regionsDl">
+            <onViewEvent type="BeforeShow"/>
+        </refresh>
+        <refresh loader="customersDl">
+            <onContainerItemChanged container="regionsDc" param="region"/>
+        </refresh>
+    </dataLoadCoordinator>
+    <!-- ... -->
+Entity Events
+REST data store sends EntitySavingEvent and EntityLoadingEvent the same as JpaDataStore. But it doesn’t send EntityChangedEvent because it cannot provide information about attributes changed since load. Instead of EntityChangedEvent, REST data store sends two specific events:
+
+RestEntitySavedEvent - sent after the entity is successfully saved to the service. It contains the saved entity instance with the state right before sending to the service.
+
+RestEntityRemovedEvent - sent after the entity is removed from the service. It contains removed entity with the state right before sending to the service.
+
+Security
+REST data store applies entity operations policy defined by resource roles and predicate policy defined by row-level roles.
+
+Authentication in REST data store can be done using Client Credentials Grant or Password Grant provided by the Authorization Server add-on. The latter requires setting the additional properties <ds-name>.authenticator and jmix.restds.authentication-provider-store as described in the Configuration section.
+
+File Storage
+The service application entities can contain FileRef links to files in its file storages. The REST DataStore add-on provides the RestFileStorage implementation of the FileStorage interface, which is a proxy that allows you to work with files located in file storages of the service application.
+
+RestFileStorage uses the generic REST Files API to transmit files between client and service application.
+
+To use RestFileStorage in your client application, define the following bean in the main application class or in any other Spring configuration class:
+
+@Bean
+FileStorage serviceappFileStorage() {
+    return new RestFileStorage("serviceapp", "fs");
+}
+Here serviceapp is the name of the REST DataStore as defined in application.properties, fs is the name of the corresponding file storage of the service application.
+
+The name of the REST file storage in the client application is formed by concatenating these parameters with a dash in between. So in the above example it will be serviceapp-fs. If you have multiple file storages in the client application (say local fs and remote serviceapp-fs), see Using Multiple File Storages for more information.
+
+See an example of working with RestFileStorage in the Separating Application Tiers guide.
+
+Invoking Services
+If the service application exposes a Java service through the REST API, client applications can consume it.
+
+@RemoteService Interfaces
+The simplest way to invoke a service is by creating an interface that mirrors the service methods and annotating it with @RemoteService. For interfaces marked with this annotation, the REST DataStore add-on generates client proxy objects. These objects automatically serialize parameters, invoke the remote REST services, and deserialize the results.
+
+The following example shows the service bean implementation:
+
+CustomerService.java in the service application
+package com.company.serviceapp.service;
+
+import com.company.serviceapp.entity.Customer;
+import io.jmix.core.DataManager;
+import io.jmix.rest.annotation.RestMethod;
+import io.jmix.rest.annotation.RestService;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.List;
+
+@RestService("customers")
+public class CustomerService {
+
+    @Autowired
+    private DataManager dataManager;
+
+    @RestMethod
+    public List<Customer> getCustomersByName(String name) {
+        return dataManager.load(Customer.class)
+                .query("e.name = ?1", name).list();
+    }
+}
+The service method is accessible via the /rest/services/customers/getCustomersByName endpoint.
+
+To call this service from the client application, create the following interface:
+
+CustomerService.java in the client application
+package com.company.clientapp.service;
+
+import com.company.clientapp.entity.Customer;
+import io.jmix.restds.annotation.RemoteService;
+
+import java.util.List;
+
+@RemoteService(store = "serviceapp", remoteName = "customers")
+public interface CustomerService {
+
+    List<Customer> getCustomersByName(String name);
+}
+The REST DataStore add-on will automatically create a bean for this interface, so you can inject it into a view or a bean and use as a regular Spring bean. For example:
+
+@Autowired
+private CustomerService customerService;
+
+private void processCustomers(String name) {
+    List<Customer> customers = customerService.getCustomersByName(name);
+    // ...
+}
+See another example of invoking a business service method in the Integrating Jmix Applications guide.
+
+Methods of @RemoteService interfaces can have parameters and results of the following types:
+
+Simple type: primitive (int, double, etc.), wrapper (Integer, Double, etc.), String.
+
+Entity
+
+Enumeration
+
+A type that have a corresponding Datatype. These include types supported in entity attributes, as well as custom data types.
+
+Arbitrary POJO or Java record with fields of all above types.
+
+java.util.List parameterized with all above types.
+
+Using RestClient
+You can also invoke any endpoints of the service application using the Spring’s RestClient preconfigured with the connection and authentication parameters of the corresponding REST data store:
+
+Obtain the RestClient instance from the RestDataStoreUtils bean using the getRestClient(String dataStoreName) method.
+
+Use the RestClient API to invoke the endpoint with appropriate parameters.
+
+Limitations
+The REST data store has the following limitations compared to the JPA data store:
+
+Lazy loading of references is not supported. References that are not loaded by the fetch plan remain null when accessed.
+
+There is no EntityChangeEvent with AttributeChanges.
+
+DataManager.loadValues() and loadValue() methods throw UnsupportedOperationException.
+
